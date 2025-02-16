@@ -2716,3 +2716,5532 @@ void UART_Task(void *pvParameters) {
 - **Semaphores** synchronize task execution.
 - **Queues** allow message passing between tasks.
 
+-----
+-----
+-----
+-----
+
+---
+
+## **1. LED Blinking using HAL**
+🔹 **Objective**: Blink an LED on the STM32F407 Discovery Board using HAL functions.
+
+### **Code: LED Blinking**
+```c
+#include "stm32f4xx.h"  // Include STM32 HAL library
+
+void SystemClock_Config(void);
+void GPIO_Init(void);
+void Delay_ms(uint32_t ms);
+
+int main(void) {
+    HAL_Init();             // Initialize the HAL Library
+    SystemClock_Config();   // Configure system clock
+    GPIO_Init();            // Initialize GPIO for LED
+
+    while (1) {
+        HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12); // Toggle LED (PD12)
+        Delay_ms(500);                          // Delay of 500ms
+    }
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOD_CLK_ENABLE();  // Enable clock for GPIOD
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_12;        // LED connected to PD12
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP; // Output mode, push-pull
+    GPIO_InitStruct.Pull = GPIO_NOPULL;       // No pull-up/down resistor
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW; // Low speed
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);   // Initialize GPIO
+}
+
+void Delay_ms(uint32_t ms) {
+    HAL_Delay(ms); // HAL built-in delay function
+}
+
+void SystemClock_Config(void) {
+    // Default system clock settings (HSE = 8MHz, PLL enabled, 168MHz)
+}
+```
+### **Explanation:**
+1. **HAL_Init()** initializes STM32 HAL.
+2. **SystemClock_Config()** sets the system clock (optional).
+3. **GPIO_Init()** enables GPIO port D and configures **PD12** as an output.
+4. **HAL_GPIO_TogglePin()** toggles the LED state every 500ms.
+5. **HAL_Delay(ms)** introduces a delay.
+
+---
+
+## **2. Switch Interfacing using HAL**
+🔹 **Objective**: Read input from a push button (connected to PA0) to control LED (PD12).
+
+### **Code: Switch Interfacing**
+```c
+#include "stm32f4xx.h"
+
+void SystemClock_Config(void);
+void GPIO_Init(void);
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    GPIO_Init();
+
+    while (1) {
+        if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET) { // If button pressed
+            HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12); // Toggle LED
+            HAL_Delay(300);  // Debounce delay
+        }
+    }
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOA_CLK_ENABLE();  // Enable clock for GPIOA
+    __HAL_RCC_GPIOD_CLK_ENABLE();  // Enable clock for GPIOD
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // LED Configuration (PD12)
+    GPIO_InitStruct.Pin = GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    // Button Configuration (PA0)
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;  // Input mode for button
+    GPIO_InitStruct.Pull = GPIO_NOPULL; // No pull-up/down
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+```
+### **Explanation:**
+1. **PA0 is configured as input**, and **PD12 as output**.
+2. **HAL_GPIO_ReadPin()** checks if the button is pressed.
+3. If **button is pressed**, **HAL_GPIO_TogglePin()** toggles the LED.
+4. **Debounce delay (300ms)** prevents unintended multiple toggles.
+
+---
+Great! Let’s move to the **next step: 7-Segment Display Interfacing** with STM32F407 using HAL.  
+
+---
+
+## **3. 7-Segment Display Interfacing using HAL**
+🔹 **Objective**: Display numbers (0–9) on a **Common Cathode** 7-segment display using GPIO.
+
+### **Wiring:**
+| 7-Segment Pin | Connected To (STM32F407) |
+|--------------|--------------------------|
+| **a** | PB0 |
+| **b** | PB1 |
+| **c** | PB2 |
+| **d** | PB3 |
+| **e** | PB4 |
+| **f** | PB5 |
+| **g** | PB6 |
+| **dp (dot)** | PB7 |
+
+### **Code: 7-Segment Display**
+```c
+#include "stm32f4xx.h"
+
+void SystemClock_Config(void);
+void GPIO_Init(void);
+void Display_Number(uint8_t num);
+void Delay_ms(uint32_t ms);
+
+// 7-Segment Lookup Table (Common Cathode)
+const uint8_t segment_map[10] = {
+    0x3F, // 0
+    0x06, // 1
+    0x5B, // 2
+    0x4F, // 3
+    0x66, // 4
+    0x6D, // 5
+    0x7D, // 6
+    0x07, // 7
+    0x7F, // 8
+    0x6F  // 9
+};
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    GPIO_Init();
+
+    while (1) {
+        for (uint8_t i = 0; i < 10; i++) { // Loop from 0 to 9
+            Display_Number(i);
+            Delay_ms(1000);  // Display each number for 1 sec
+        }
+    }
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOB_CLK_ENABLE();  // Enable clock for GPIOB
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3 |
+                          GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7; // All segment pins
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+}
+
+void Display_Number(uint8_t num) {
+    uint8_t data = segment_map[num]; // Get segment data
+    for (uint8_t i = 0; i < 8; i++) {
+        HAL_GPIO_WritePin(GPIOB, (1 << i), (data >> i) & 0x01); // Set each segment pin
+    }
+}
+
+void Delay_ms(uint32_t ms) {
+    HAL_Delay(ms);
+}
+```
+
+---
+
+### **Explanation:**
+1. **7-Segment Common Cathode**: LOW (0) turns OFF the segment, HIGH (1) turns it ON.
+2. **segment_map[]** stores the binary patterns for displaying **0-9**.
+3. **Display_Number(num)**:
+   - Extracts the **binary pattern** from `segment_map[]`.
+   - Sets the **corresponding GPIO pins** to display the number.
+4. **Loop (0-9)**: Cycles through numbers **0 to 9**, updating the display every second.
+
+---
+
+### **4. DC Motor Interfacing with L298N using STM32F407 (HAL)**
+🔹 **Objective**: Control the direction and speed of a **DC motor** using the **L298N motor driver** and **PWM**.
+
+---
+
+### **Connections:**
+| L298N Pin | STM32F407 Pin |
+|-----------|--------------|
+| IN1 | PA0 |
+| IN2 | PA1 |
+| ENA (PWM) | PA2 |
+
+- **IN1 & IN2** control the **direction**.
+- **ENA (PWM)** controls the **speed**.
+
+---
+
+### **Code: DC Motor Control**
+```c
+#include "stm32f4xx.h"
+
+void SystemClock_Config(void);
+void GPIO_Init(void);
+void PWM_Init(void);
+void Motor_Control(uint8_t direction, uint8_t speed);
+void Delay_ms(uint32_t ms);
+
+TIM_HandleTypeDef htim2;
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    GPIO_Init();
+    PWM_Init();
+
+    while (1) {
+        // Rotate Motor Forward at 50% Speed
+        Motor_Control(1, 50);
+        Delay_ms(3000);
+
+        // Stop Motor
+        Motor_Control(0, 0);
+        Delay_ms(1000);
+
+        // Rotate Motor Backward at 75% Speed
+        Motor_Control(2, 75);
+        Delay_ms(3000);
+
+        // Stop Motor
+        Motor_Control(0, 0);
+        Delay_ms(1000);
+    }
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOA_CLK_ENABLE(); // Enable clock for GPIOA
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Configure IN1 (PA0) & IN2 (PA1) as Output
+    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+void PWM_Init(void) {
+    __HAL_RCC_TIM2_CLK_ENABLE(); // Enable clock for TIM2
+
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 84 - 1; // 1 MHz timer clock
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 100 - 1; // 100 steps for duty cycle
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_PWM_Init(&htim2);
+
+    TIM_OC_InitTypeDef sConfigOC = {0};
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = 0; // Default: Motor off
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, TIM_CHANNEL_3);
+
+    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_3);
+}
+
+void Motor_Control(uint8_t direction, uint8_t speed) {
+    if (direction == 1) { // Forward
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+    } else if (direction == 2) { // Backward
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
+    } else { // Stop
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+    }
+
+    __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_3, speed); // Set PWM Duty Cycle (0-100)
+}
+
+void Delay_ms(uint32_t ms) {
+    HAL_Delay(ms);
+}
+```
+
+---
+
+### **Explanation:**
+1. **Motor Direction Control:**
+   - **IN1 = HIGH, IN2 = LOW** → Forward Rotation 🡆
+   - **IN1 = LOW, IN2 = HIGH** → Reverse Rotation 🡄
+   - **IN1 = LOW, IN2 = LOW** → Stop ✋
+
+2. **PWM for Speed Control:**
+   - **TIM2 Channel 3 (PA2)** is configured for **PWM**.
+   - Duty cycle varies from **0% (stop) to 100% (full speed)**.
+
+3. **Motor Operation:**
+   - Forward @ 50% speed → 3 sec
+   - Stop → 1 sec
+   - Reverse @ 75% speed → 3 sec
+   - Stop → 1 sec (Loop repeats)
+
+---
+
+### **5. LCD 16x2 Interfacing in 4-bit Mode with STM32F407 (HAL)**
+🔹 **Objective**: Interface a **16x2 LCD** in **4-bit mode** using **GPIO**.
+
+---
+
+### **Connections:**
+| LCD Pin | STM32F407 Pin |
+|---------|--------------|
+| RS | PB0 |
+| RW | GND (Always Write Mode) |
+| EN | PB1 |
+| D4 | PB4 |
+| D5 | PB5 |
+| D6 | PB6 |
+| D7 | PB7 |
+| VSS | GND |
+| VDD | +5V |
+| VEE | Potentiometer (Contrast Control) |
+
+---
+
+### **Code: LCD 4-bit Mode**
+```c
+#include "stm32f4xx.h"
+
+void SystemClock_Config(void);
+void GPIO_Init(void);
+void LCD_Init(void);
+void LCD_Send_Cmd(uint8_t cmd);
+void LCD_Send_Data(uint8_t data);
+void LCD_Send_String(char *str);
+void LCD_Enable(void);
+void Delay_ms(uint32_t ms);
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    GPIO_Init();
+    LCD_Init();
+
+    while (1) {
+        LCD_Send_String("Hello, STM32!");
+        HAL_Delay(2000);
+        
+        LCD_Send_Cmd(0x01); // Clear display
+        HAL_Delay(500);
+
+        LCD_Send_String("LCD 4-bit Mode");
+        HAL_Delay(2000);
+
+        LCD_Send_Cmd(0x01); // Clear display
+        HAL_Delay(500);
+    }
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOB_CLK_ENABLE(); // Enable clock for GPIOB
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Configure RS, EN, D4-D7 as Output
+    GPIO_InitStruct.Pin = GPIO_PIN_0 | GPIO_PIN_1 | GPIO_PIN_4 | GPIO_PIN_5 | GPIO_PIN_6 | GPIO_PIN_7;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+}
+
+void LCD_Init(void) {
+    HAL_Delay(20); // Power ON delay
+
+    // Set LCD in 4-bit mode
+    LCD_Send_Cmd(0x33);
+    LCD_Send_Cmd(0x32);
+
+    LCD_Send_Cmd(0x28); // 4-bit mode, 2-line, 5x8 dots
+    LCD_Send_Cmd(0x0C); // Display ON, Cursor OFF
+    LCD_Send_Cmd(0x06); // Entry Mode: Auto Increment
+    LCD_Send_Cmd(0x01); // Clear Display
+}
+
+void LCD_Send_Cmd(uint8_t cmd) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_RESET); // RS = 0 (Command Mode)
+
+    // Send Upper Nibble
+    GPIOB->ODR = (GPIOB->ODR & 0xFF0F) | ((cmd & 0xF0) >> 4);
+    LCD_Enable();
+
+    // Send Lower Nibble
+    GPIOB->ODR = (GPIOB->ODR & 0xFF0F) | (cmd & 0x0F);
+    LCD_Enable();
+}
+
+void LCD_Send_Data(uint8_t data) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_0, GPIO_PIN_SET); // RS = 1 (Data Mode)
+
+    // Send Upper Nibble
+    GPIOB->ODR = (GPIOB->ODR & 0xFF0F) | ((data & 0xF0) >> 4);
+    LCD_Enable();
+
+    // Send Lower Nibble
+    GPIOB->ODR = (GPIOB->ODR & 0xFF0F) | (data & 0x0F);
+    LCD_Enable();
+}
+
+void LCD_Send_String(char *str) {
+    while (*str) {
+        LCD_Send_Data(*str++);
+    }
+}
+
+void LCD_Enable(void) {
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_SET); // EN = 1
+    HAL_Delay(1);
+    HAL_GPIO_WritePin(GPIOB, GPIO_PIN_1, GPIO_PIN_RESET); // EN = 0
+    HAL_Delay(1);
+}
+
+void Delay_ms(uint32_t ms) {
+    HAL_Delay(ms);
+}
+```
+
+---
+
+### **Explanation:**
+1. **4-bit Mode Communication:**
+   - Only **D4-D7** are connected, reducing pin usage.
+   - Commands are sent **in two parts** (Upper & Lower Nibble).
+
+2. **LCD Initialization:**
+   - **Function Set (0x28)** → 4-bit, 2-line, 5x8 dots.
+   - **Display ON (0x0C)** → Display ON, Cursor OFF.
+   - **Entry Mode (0x06)** → Auto increment cursor.
+   - **Clear Display (0x01)** → Clears LCD.
+
+3. **LCD Operation:**
+   - Displays `"Hello, STM32!"` for **2 sec**.
+   - Clears LCD and shows `"LCD 4-bit Mode"`.
+   - Repeats in a loop.
+
+---
+
+### **6. LCD 16x2 Interfacing using I2C with STM32F407 (HAL)**
+🔹 **Objective**: Interface a **16x2 LCD** using **I2C module (PCF8574)** with **STM32F407 DISC**.
+
+---
+
+### **Connections (I2C LCD - PCF8574 to STM32F407)**
+| LCD Pin | PCF8574 Pin | STM32F407 Pin |
+|---------|------------|--------------|
+| SDA | SDA | PB9 |
+| SCL | SCL | PB8 |
+| VCC | VCC | +5V |
+| GND | GND | GND |
+
+**I2C Address for PCF8574:** `0x27` or `0x3F` (depends on module version).
+
+---
+
+### **Code: LCD I2C Mode**
+```c
+#include "stm32f4xx.h"
+#include "stm32f4xx_hal.h"
+
+#define LCD_ADDR 0x27 << 1  // I2C Address (shifted for HAL)
+#define LCD_BACKLIGHT 0x08  // Backlight ON
+#define LCD_ENABLE 0x04     // Enable bit
+#define LCD_CMD 0           // Command mode
+#define LCD_DATA 1          // Data mode
+
+I2C_HandleTypeDef hi2c1;
+
+void SystemClock_Config(void);
+void I2C1_Init(void);
+void LCD_Init(void);
+void LCD_Send_Cmd(uint8_t cmd);
+void LCD_Send_Data(uint8_t data);
+void LCD_Send_String(char *str);
+void LCD_Write_4Bits(uint8_t data, uint8_t mode);
+void LCD_Enable_Signal(uint8_t data);
+void Delay_ms(uint32_t ms);
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    I2C1_Init();
+    LCD_Init();
+
+    while (1) {
+        LCD_Send_String("Hello, I2C LCD!");
+        HAL_Delay(2000);
+
+        LCD_Send_Cmd(0x01); // Clear Display
+        HAL_Delay(500);
+
+        LCD_Send_String("STM32 I2C Mode");
+        HAL_Delay(2000);
+
+        LCD_Send_Cmd(0x01); // Clear Display
+        HAL_Delay(500);
+    }
+}
+
+void I2C1_Init(void) {
+    __HAL_RCC_I2C1_CLK_ENABLE();
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_8 | GPIO_PIN_9;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_OD;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF4_I2C1;
+    HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+    hi2c1.Instance = I2C1;
+    hi2c1.Init.ClockSpeed = 100000;
+    hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+    hi2c1.Init.OwnAddress1 = 0;
+    hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+    hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+    hi2c1.Init.OwnAddress2 = 0;
+    hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+    hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+    HAL_I2C_Init(&hi2c1);
+}
+
+void LCD_Init(void) {
+    HAL_Delay(50); // Power-on delay
+
+    LCD_Send_Cmd(0x33); // Initialize LCD
+    LCD_Send_Cmd(0x32); // Set to 4-bit mode
+    LCD_Send_Cmd(0x28); // 4-bit, 2-line, 5x8 dots
+    LCD_Send_Cmd(0x0C); // Display ON, Cursor OFF
+    LCD_Send_Cmd(0x06); // Auto Increment
+    LCD_Send_Cmd(0x01); // Clear Display
+}
+
+void LCD_Send_Cmd(uint8_t cmd) {
+    LCD_Write_4Bits(cmd & 0xF0, LCD_CMD);
+    LCD_Write_4Bits((cmd << 4) & 0xF0, LCD_CMD);
+}
+
+void LCD_Send_Data(uint8_t data) {
+    LCD_Write_4Bits(data & 0xF0, LCD_DATA);
+    LCD_Write_4Bits((data << 4) & 0xF0, LCD_DATA);
+}
+
+void LCD_Send_String(char *str) {
+    while (*str) {
+        LCD_Send_Data(*str++);
+    }
+}
+
+void LCD_Write_4Bits(uint8_t data, uint8_t mode) {
+    uint8_t data_out = data | LCD_BACKLIGHT | mode;
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &data_out, 1, 10);
+    LCD_Enable_Signal(data_out);
+}
+
+void LCD_Enable_Signal(uint8_t data) {
+    uint8_t temp = data | LCD_ENABLE;
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &temp, 1, 10);
+    HAL_Delay(1);
+    temp &= ~LCD_ENABLE;
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &temp, 1, 10);
+    HAL_Delay(1);
+}
+
+void Delay_ms(uint32_t ms) {
+    HAL_Delay(ms);
+}
+```
+
+---
+
+### **Explanation:**
+1. **I2C Communication with PCF8574:**
+   - PCF8574 extends **I2C** for controlling LCD.
+   - LCD data is sent **4 bits at a time** via I2C.
+   - **Backlight and Enable control** are handled via I2C.
+
+2. **LCD Initialization:**
+   - **0x33, 0x32** → Switch LCD to **4-bit mode**.
+   - **0x28** → Set LCD for **4-bit, 2-line**.
+   - **0x0C** → Display ON, Cursor OFF.
+   - **0x01** → Clear Display.
+
+3. **LCD Operations:**
+   - `"Hello, I2C LCD!"` is displayed for **2 sec**.
+   - Clears LCD, displays `"STM32 I2C Mode"` for **2 sec**.
+   - Loop repeats.
+
+---
+### **7. UART Communication with STM32F407 (HAL)**
+🔹 **Objective**: Send and receive data over UART using HAL.
+
+---
+
+### **Connections (STM32F407 to USB-TTL Converter)**
+| STM32F407 Pin | USB-TTL Converter |
+|--------------|------------------|
+| **PA2 (TX)** | **RX** |
+| **PA3 (RX)** | **TX** |
+| **GND** | **GND** |
+
+💡 **Use a USB-TTL Converter** (CP2102/FTDI) to connect the STM32F407 to a PC.
+
+---
+
+### **Code: UART Communication (Send & Receive)**
+```c
+#include "stm32f4xx.h"
+#include "stm32f4xx_hal.h"
+#include <string.h>
+
+UART_HandleTypeDef huart2;
+
+void SystemClock_Config(void);
+void UART2_Init(void);
+void UART_Send_String(char *str);
+void UART_Receive_String(void);
+
+uint8_t rxBuffer[50];  // Buffer to store received data
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    UART2_Init();
+
+    char msg[] = "UART Initialized!\r\n";
+    UART_Send_String(msg);
+
+    while (1) {
+        UART_Receive_String();  // Wait for user input
+        UART_Send_String("Received: ");
+        UART_Send_String((char *)rxBuffer);
+        UART_Send_String("\r\n");
+    }
+}
+
+void UART2_Init(void) {
+    __HAL_RCC_USART2_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_2 | GPIO_PIN_3;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+void UART_Send_String(char *str) {
+    HAL_UART_Transmit(&huart2, (uint8_t *)str, strlen(str), HAL_MAX_DELAY);
+}
+
+void UART_Receive_String(void) {
+    HAL_UART_Receive(&huart2, rxBuffer, sizeof(rxBuffer), HAL_MAX_DELAY);
+}
+```
+
+---
+
+### **Explanation:**
+1. **UART Initialization:**
+   - `PA2` → **TX** (Transmit).
+   - `PA3` → **RX** (Receive).
+   - Baud rate **115200**.
+   - 8-bit data, 1 stop bit, no parity.
+
+2. **UART Send & Receive:**
+   - `UART_Send_String()` → Transmits a string.
+   - `UART_Receive_String()` → Receives user input into `rxBuffer`.
+   - Loops indefinitely, echoing received data.
+
+3. **Testing on PC:**
+   - Use **PuTTY/Tera Term**.
+   - Set **115200 baud rate**.
+   - Type a message → STM32 echoes back with `"Received: <your message>"`.
+
+---
+
+### **8. UART with ADC (STM32F407 - HAL)**
+🔹 **Objective**: Read ADC values and send them via UART.
+
+---
+
+### **Connections**
+| Component | STM32F407 Pin |
+|-----------|-------------|
+| Potentiometer (Middle Pin) | PA0 (ADC Input) |
+| Potentiometer (Other Pins) | VCC, GND |
+| UART TX (PA2) | USB-TTL RX |
+| UART RX (PA3) | USB-TTL TX |
+
+---
+
+### **Code: Read ADC and Send Data via UART**
+```c
+#include "stm32f4xx.h"
+#include "stm32f4xx_hal.h"
+#include <stdio.h>
+
+ADC_HandleTypeDef hadc1;
+UART_HandleTypeDef huart2;
+
+void SystemClock_Config(void);
+void ADC1_Init(void);
+void UART2_Init(void);
+void UART_Send_String(char *str);
+uint32_t Read_ADC(void);
+
+char msg[50]; // Buffer for UART messages
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    ADC1_Init();
+    UART2_Init();
+
+    UART_Send_String("ADC & UART Initialized!\r\n");
+
+    while (1) {
+        uint32_t adcValue = Read_ADC();
+        float voltage = (adcValue / 4095.0) * 3.3;  // Convert ADC value to voltage
+
+        sprintf(msg, "ADC Value: %lu, Voltage: %.2fV\r\n", adcValue, voltage);
+        UART_Send_String(msg);
+
+        HAL_Delay(1000);  // Send every 1 second
+    }
+}
+
+void ADC1_Init(void) {
+    __HAL_RCC_ADC1_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    hadc1.Instance = ADC1;
+    hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+    hadc1.Init.ScanConvMode = DISABLE;
+    hadc1.Init.ContinuousConvMode = DISABLE;
+    hadc1.Init.DiscontinuousConvMode = DISABLE;
+    hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+    hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+    hadc1.Init.NbrOfConversion = 1;
+    HAL_ADC_Init(&hadc1);
+}
+
+void UART2_Init(void) {
+    __HAL_RCC_USART2_CLK_ENABLE();
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_2 | GPIO_PIN_3;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+    GPIO_InitStruct.Alternate = GPIO_AF7_USART2;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+uint32_t Read_ADC(void) {
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
+    return HAL_ADC_GetValue(&hadc1);
+}
+
+void UART_Send_String(char *str) {
+    HAL_UART_Transmit(&huart2, (uint8_t *)str, strlen(str), HAL_MAX_DELAY);
+}
+```
+
+---
+
+### **Explanation:**
+1. **ADC Initialization:**
+   - Uses **PA0** as an **analog input**.
+   - 12-bit resolution → Values range from **0 to 4095**.
+   - Converts voltage **0V - 3.3V**.
+
+2. **UART Initialization:**
+   - **PA2 (TX) → USB-TTL RX**.
+   - **PA3 (RX) → USB-TTL TX**.
+   - Baud rate: **115200**.
+
+3. **Reading and Sending Data:**
+   - `Read_ADC()` reads ADC values.
+   - Converts ADC value to voltage (`voltage = (adcValue / 4095.0) * 3.3`).
+   - Sends the ADC value and voltage via **UART**.
+   - **Every second**, it sends data to the terminal.
+
+---
+
+### **Testing:**
+1. Connect a **potentiometer** to **PA0**.
+2. Open **PuTTY/Tera Term** (Baud: 115200).
+3. Rotate the potentiometer and observe **ADC value & voltage**.
+
+---
+
+### **9. Timer (STM32F407 - HAL)**
+🔹 **Objective**: Generate a 1-second delay using Timer.
+
+---
+
+### **Connections**
+| Component | STM32F407 Pin |
+|-----------|-------------|
+| LED       | PA5 (Onboard LED) |
+
+---
+
+### **Code: Timer-based LED Blinking**
+```c
+#include "stm32f4xx.h"
+#include "stm32f4xx_hal.h"
+
+TIM_HandleTypeDef htim2;
+
+void SystemClock_Config(void);
+void Timer2_Init(void);
+void GPIO_Init(void);
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    GPIO_Init();
+    Timer2_Init();
+
+    HAL_TIM_Base_Start(&htim2); // Start Timer
+
+    while (1) {
+        if (__HAL_TIM_GET_FLAG(&htim2, TIM_FLAG_UPDATE)) {  // Check if timer has overflowed
+            __HAL_TIM_CLEAR_FLAG(&htim2, TIM_FLAG_UPDATE);  // Clear the flag
+            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle LED
+        }
+    }
+}
+
+void Timer2_Init(void) {
+    __HAL_RCC_TIM2_CLK_ENABLE();
+
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 16000 - 1;  // Scale down 16 MHz to 1 kHz
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 1000 - 1;  // 1-second delay (1000 ms)
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_Base_Init(&htim2);
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+```
+
+---
+
+### **Explanation:**
+1. **Timer Initialization (TIM2)**
+   - Prescaler: `16000 - 1` → Reduces **16 MHz** to **1 kHz**.
+   - Period: `1000 - 1` → Generates an **interrupt every 1 second**.
+
+2. **LED Control**
+   - Checks if **TIM2 overflowed**.
+   - Toggles LED **every second**.
+
+---
+
+### **Testing:**
+1. Flash code onto the STM32F407 board.
+2. Observe the **onboard LED (PA5) toggling every second**.
+
+---
+
+### **10. PWM (STM32F407 - HAL)**
+🔹 **Objective**: Generate a PWM signal to control LED brightness.
+
+---
+
+### **Connections**
+| Component | STM32F407 Pin |
+|-----------|-------------|
+| LED       | PA5 (PWM Output) |
+
+---
+
+### **Code: PWM LED Dimming**
+```c
+#include "stm32f4xx.h"
+#include "stm32f4xx_hal.h"
+
+TIM_HandleTypeDef htim2;
+void SystemClock_Config(void);
+void PWM_Init(void);
+void GPIO_Init(void);
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    GPIO_Init();
+    PWM_Init();
+
+    HAL_TIM_PWM_Start(&htim2, TIM_CHANNEL_1); // Start PWM on Timer 2, Channel 1
+
+    while (1) {
+        for (int duty = 0; duty <= 100; duty += 10) {  // Increase brightness
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, (duty * 100));  
+            HAL_Delay(500);
+        }
+        for (int duty = 100; duty >= 0; duty -= 10) {  // Decrease brightness
+            __HAL_TIM_SET_COMPARE(&htim2, TIM_CHANNEL_1, (duty * 100));  
+            HAL_Delay(500);
+        }
+    }
+}
+
+void PWM_Init(void) {
+    __HAL_RCC_TIM2_CLK_ENABLE();  // Enable Timer 2 clock
+
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 16 - 1;  // 16 MHz / 16 = 1 MHz Timer clock
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 10000 - 1;  // Set PWM period to 10 ms (100 Hz)
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_PWM_Init(&htim2);
+
+    TIM_OC_InitTypeDef sConfigPWM = {0};
+    sConfigPWM.OCMode = TIM_OCMODE_PWM1;
+    sConfigPWM.Pulse = 0;  // Initial Duty Cycle
+    sConfigPWM.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigPWM.OCFastMode = TIM_OCFAST_DISABLE;
+    HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigPWM, TIM_CHANNEL_1);
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_5;  
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;  // Alternate Function Mode for PWM
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;  // TIM2 CH1 Alternate Function
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+```
+
+---
+
+### **Explanation:**
+1. **PWM Configuration**
+   - Timer **Prescaler**: `16 - 1` → Reduces **16 MHz** to **1 MHz**.
+   - **Period**: `10000 - 1` → Generates **100 Hz PWM signal**.
+   - **Duty Cycle** controlled via `__HAL_TIM_SET_COMPARE()`.
+
+2. **LED Brightness Control**
+   - Gradually **increases** and **decreases** brightness **every 500ms**.
+
+---
+
+### **Testing:**
+1. Flash code onto the STM32F407 board.
+2. Observe **LED brightness smoothly increasing and decreasing**.
+
+---
+
+### **11. Interrupts (Internal & Timer Interrupt) - STM32F407 HAL**
+🔹 **Objective**: Handle button press using **External Interrupt (EXTI)** and generate periodic events using a **Timer Interrupt**.
+
+---
+
+### **Connections**
+| Component | STM32F407 Pin |
+|-----------|-------------|
+| Push Button | PC13 (EXTI Input) |
+| LED | PA5 (Output) |
+
+---
+
+### **Code: External & Timer Interrupt**
+```c
+#include "stm32f4xx.h"
+#include "stm32f4xx_hal.h"
+
+TIM_HandleTypeDef htim2;
+
+void SystemClock_Config(void);
+void GPIO_Init(void);
+void Timer2_Init(void);
+void EXTI_Init(void);
+
+int led_state = 0;
+
+int main(void) {
+    HAL_Init();
+    SystemClock_Config();
+    GPIO_Init();
+    Timer2_Init();
+    EXTI_Init();
+
+    HAL_TIM_Base_Start_IT(&htim2);  // Start Timer2 with Interrupt
+
+    while (1) {
+        // Main loop does nothing, all handled by interrupts
+    }
+}
+
+// External Interrupt Handler (Button Press)
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+    if (GPIO_Pin == GPIO_PIN_13) {  // Check if PC13 triggered
+        led_state = !led_state;  // Toggle LED state
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, (GPIO_PinState)led_state);
+    }
+}
+
+// Timer Interrupt Handler (Blink LED every second)
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
+    if (htim->Instance == TIM2) {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);  // Toggle LED on PA5
+    }
+}
+
+void GPIO_Init(void) {
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    
+    // LED Output (PA5)
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Button Input (PC13)
+    GPIO_InitStruct.Pin = GPIO_PIN_13;
+    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;  // Interrupt on falling edge
+    GPIO_InitStruct.Pull = GPIO_PULLUP;  // Enable pull-up resistor
+    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
+
+void Timer2_Init(void) {
+    __HAL_RCC_TIM2_CLK_ENABLE();
+
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 16000 - 1;  // 16 MHz / 16000 = 1 kHz timer clock
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 1000 - 1;  // 1 kHz / 1000 = 1 Hz (1-second interrupt)
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_Base_Init(&htim2);
+
+    HAL_NVIC_SetPriority(TIM2_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(TIM2_IRQn);
+}
+
+void EXTI_Init(void) {
+    HAL_NVIC_SetPriority(EXTI15_10_IRQn, 2, 0);
+    HAL_NVIC_EnableIRQ(EXTI15_10_IRQn);
+}
+
+// Timer2 ISR
+void TIM2_IRQHandler(void) {
+    HAL_TIM_IRQHandler(&htim2);
+}
+
+// External Interrupt ISR
+void EXTI15_10_IRQHandler(void) {
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_13);
+}
+```
+
+---
+
+### **Explanation**
+1. **Button Interrupt (EXTI)**
+   - Button on `PC13` triggers **falling edge interrupt**.
+   - ISR toggles LED state (`PA5`).
+
+2. **Timer Interrupt (TIM2)**
+   - Configured to generate an **interrupt every 1 second**.
+   - ISR toggles LED on `PA5` periodically.
+
+3. **NVIC Configuration**
+   - **EXTI15_10_IRQn** handles button press.
+   - **TIM2_IRQn** handles timer interrupts.
+
+---
+
+### **Testing**
+1. **Button Press** → LED toggles instantly.
+2. **Every 1 second** → LED blinks automatically.
+
+---
+
+### **Done! ✅**
+This concludes the **Interrupt Handling** section. 🚀
+
+----
+----
+----
+----
+---
+
+### **Step 1: LED Blinking with Delay (Basic GPIO Output)**  
+#### **Theory:**  
+- GPIO (General Purpose Input/Output) is used to control LEDs.  
+- The STM32F407 Discovery board has built-in LEDs (e.g., **Green: PD12, Orange: PD13, Red: PD14, Blue: PD15**).  
+- We can turn an LED ON/OFF using HAL functions:  
+  - `HAL_GPIO_WritePin(GPIOx, PIN, STATE);`  
+  - `HAL_Delay(ms);` for adding delay.  
+
+---
+
+### **Practical: Blinking LED on STM32F407 DISC1**
+#### **Steps to Implement:**
+1. **Open STM32CubeIDE and Create a New Project.**  
+2. **Select STM32F407 Discovery Board.**  
+3. **Go to Pin Configuration:**
+   - Set **PD12 (Green LED)** as **GPIO_Output**.  
+4. **Generate Code and Write the Following in `main.c`:**
+
+```c
+#include "main.h"
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+
+int main(void)
+{
+    HAL_Init();                // Initialize HAL Library
+    SystemClock_Config();       // Configure System Clock
+    MX_GPIO_Init();             // Initialize GPIO
+
+    while (1)
+    {
+        HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);  // Toggle LED on PD12
+        HAL_Delay(500);                          // Wait for 500ms
+    }
+}
+
+/* GPIO Initialization Function */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOD_CLK_ENABLE();  // Enable Clock for GPIOD
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;  // Set as Output Push-Pull
+    GPIO_InitStruct.Pull = GPIO_NOPULL;          // No Pull-up/Pull-down
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW; // Low speed
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // This function is auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of the Code:**
+- **HAL_Init();** → Initializes STM32 HAL Library.  
+- **SystemClock_Config();** → Configures the system clock.  
+- **MX_GPIO_Init();** → Initializes GPIO for LED.  
+- **HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);** → Toggles LED.  
+- **HAL_Delay(500);** → Adds 500ms delay.  
+
+---
+
+### **Expected Output:**  
+- The **Green LED (PD12)** will **blink every 500ms**.  
+
+---
+
+### **Next Step: Push Button Input (GPIO Input Handling)**
+
+### **Step 2: Push Button Interfacing (GPIO Input Handling)**  
+#### **Theory:**  
+- GPIO pins can be configured as **inputs** to read button states.  
+- The STM32F407 Discovery board has a **USER button (PA0)** connected to **ground** when pressed.  
+- We use **HAL_GPIO_ReadPin(GPIOx, PIN)** to read button state.  
+
+---
+
+### **Practical: Control LED with Push Button**
+#### **Steps to Implement:**  
+1. **Open STM32CubeIDE and Create a New Project.**  
+2. **Select STM32F407 Discovery Board.**  
+3. **Go to Pin Configuration:**
+   - Set **PA0 (Button)** as **GPIO_Input**.  
+   - Set **PD12 (LED)** as **GPIO_Output**.  
+4. **Generate Code and Write the Following in `main.c`:**  
+
+```c
+#include "main.h"
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+
+int main(void)
+{
+    HAL_Init();                 // Initialize HAL Library
+    SystemClock_Config();        // Configure System Clock
+    MX_GPIO_Init();              // Initialize GPIO
+
+    while (1)
+    {
+        if (HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0) == GPIO_PIN_SET)  // Check if button is pressed
+        {
+            HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12);  // Toggle LED
+            HAL_Delay(200);  // Debounce delay
+        }
+    }
+}
+
+/* GPIO Initialization Function */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();  // Enable Clock for GPIOA (Button)
+    __HAL_RCC_GPIOD_CLK_ENABLE();  // Enable Clock for GPIOD (LED)
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Configure LED (PD12)
+    GPIO_InitStruct.Pin = GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    // Configure Button (PA0)
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;  // No Pull-up/Pull-down
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of the Code:**  
+- **HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_0)** → Reads button state.  
+- **If button is pressed (PA0 == HIGH), toggle LED.**  
+- **HAL_Delay(200)** → Debounce delay to avoid multiple detections.  
+
+---
+
+### **Expected Output:**  
+- Pressing the **USER button (PA0)** **toggles the LED (PD12) ON/OFF**.  
+
+---
+
+### **Next Step: 7-Segment Display Interfacing**  
+
+### **Step 3: 7-Segment Display Interfacing**  
+#### **Theory:**  
+- A **7-segment display** consists of **8 LEDs (A to G + DP)**.  
+- Each segment is controlled by **GPIO pins**.  
+- Two types: **Common Anode (CA)** & **Common Cathode (CC)**.  
+- We use **GPIO_WritePin()** to turn ON/OFF each segment.  
+
+---
+
+### **Practical: Display Numbers (0-9) on 7-Segment**  
+#### **Steps to Implement:**  
+1. **Connect 7-Segment Display to STM32F407:**  
+   - **Common Cathode**: GND to **GND**.  
+   - **Segments (A-G, DP)** → Any **GPIO Output Pins**.  
+
+2. **Configure GPIO Pins for Output:**  
+   - Assign **PD0 - PD6** to **A-G Segments**.  
+
+3. **Generate Code and Modify `main.c`:**  
+
+```c
+#include "main.h"
+
+// Define segment connections (Common Cathode)
+#define SEG_A GPIO_PIN_0
+#define SEG_B GPIO_PIN_1
+#define SEG_C GPIO_PIN_2
+#define SEG_D GPIO_PIN_3
+#define SEG_E GPIO_PIN_4
+#define SEG_F GPIO_PIN_5
+#define SEG_G GPIO_PIN_6
+
+GPIO_TypeDef *SEG_PORT = GPIOD;
+
+// Lookup table for numbers 0-9
+const uint8_t SEGMENT_MAP[10] = {
+    0b0111111, // 0
+    0b0000110, // 1
+    0b1011011, // 2
+    0b1001111, // 3
+    0b1100110, // 4
+    0b1101101, // 5
+    0b1111101, // 6
+    0b0000111, // 7
+    0b1111111, // 8
+    0b1101111  // 9
+};
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void displayNumber(uint8_t num);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    while (1)
+    {
+        for (uint8_t i = 0; i < 10; i++)
+        {
+            displayNumber(i);  // Show number on 7-segment
+            HAL_Delay(1000);   // Delay 1s between numbers
+        }
+    }
+}
+
+/* Function to Display Number */
+void displayNumber(uint8_t num)
+{
+    uint8_t data = SEGMENT_MAP[num];
+
+    HAL_GPIO_WritePin(SEG_PORT, SEG_A, (data >> 0) & 1);
+    HAL_GPIO_WritePin(SEG_PORT, SEG_B, (data >> 1) & 1);
+    HAL_GPIO_WritePin(SEG_PORT, SEG_C, (data >> 2) & 1);
+    HAL_GPIO_WritePin(SEG_PORT, SEG_D, (data >> 3) & 1);
+    HAL_GPIO_WritePin(SEG_PORT, SEG_E, (data >> 4) & 1);
+    HAL_GPIO_WritePin(SEG_PORT, SEG_F, (data >> 5) & 1);
+    HAL_GPIO_WritePin(SEG_PORT, SEG_G, (data >> 6) & 1);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+
+    GPIO_InitStruct.Pin = SEG_A | SEG_B | SEG_C | SEG_D | SEG_E | SEG_F | SEG_G;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **SEGMENT_MAP** → Stores **bit patterns** for numbers **0-9**.  
+- **displayNumber(num)** → Controls GPIO pins based on **lookup table**.  
+- **HAL_GPIO_WritePin()** → Turns ON/OFF each segment.  
+- **Loop through 0-9 with 1s delay** to display numbers sequentially.  
+
+---
+
+### **Expected Output:**  
+- The **7-segment display** cycles through **0-9** every **1 second**.  
+
+---
+
+### **Next Step: DC Motor Control with L298N**  
+
+
+### **Step 4: DC Motor Control with L298N**  
+
+#### **Theory:**  
+- **L298N** is a **dual H-Bridge motor driver** that controls **speed** and **direction** of **DC motors**.  
+- Requires **two input pins** (IN1, IN2) to control **direction**.  
+- **PWM on ENA pin** controls **speed**.  
+
+---
+
+### **Practical: Control DC Motor Using STM32F407 + L298N**  
+#### **Connections:**  
+| L298N Pin | STM32 Pin | Function |
+|-----------|----------|----------|
+| **ENA**   | **PA0** (PWM) | Speed Control |
+| **IN1**   | **PA1** (GPIO) | Motor Direction 1 |
+| **IN2**   | **PA2** (GPIO) | Motor Direction 2 |
+| **GND**   | **GND** | Common Ground |
+| **VCC**   | **5V** | Power |
+| **Motor Outputs** | **DC Motor** | Connect to Motor |
+
+---
+
+### **Steps to Implement:**  
+1. **Configure GPIO Pins for Direction (IN1, IN2)**.  
+2. **Generate PWM on ENA for Speed Control**.  
+3. **Write functions for motor control** (Forward, Reverse, Stop).  
+4. **Use PWM to vary speed dynamically**.  
+
+---
+
+### **Code for Controlling DC Motor (PWM + Direction)**  
+
+```c
+#include "main.h"
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_TIM2_Init(void);
+void setMotorDirection(uint8_t direction);
+void setMotorSpeed(uint16_t speed);
+
+TIM_HandleTypeDef htim2;  // Timer for PWM
+
+#define MOTOR_FORWARD  1
+#define MOTOR_REVERSE  2
+#define MOTOR_STOP     0
+
+#define IN1 GPIO_PIN_1
+#define IN2 GPIO_PIN_2
+#define ENA TIM_CHANNEL_1  // PWM on TIM2_CH1
+#define MOTOR_PORT GPIOA
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_TIM2_Init();
+
+    HAL_TIM_PWM_Start(&htim2, ENA);  // Start PWM
+
+    while (1)
+    {
+        setMotorDirection(MOTOR_FORWARD);
+        setMotorSpeed(50);  // 50% Speed
+        HAL_Delay(3000);
+
+        setMotorDirection(MOTOR_REVERSE);
+        setMotorSpeed(100);  // 100% Speed
+        HAL_Delay(3000);
+
+        setMotorDirection(MOTOR_STOP);
+        HAL_Delay(2000);
+    }
+}
+
+/* Function to Set Motor Direction */
+void setMotorDirection(uint8_t direction)
+{
+    if (direction == MOTOR_FORWARD)
+    {
+        HAL_GPIO_WritePin(MOTOR_PORT, IN1, GPIO_PIN_SET);
+        HAL_GPIO_WritePin(MOTOR_PORT, IN2, GPIO_PIN_RESET);
+    }
+    else if (direction == MOTOR_REVERSE)
+    {
+        HAL_GPIO_WritePin(MOTOR_PORT, IN1, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(MOTOR_PORT, IN2, GPIO_PIN_SET);
+    }
+    else  // MOTOR_STOP
+    {
+        HAL_GPIO_WritePin(MOTOR_PORT, IN1, GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(MOTOR_PORT, IN2, GPIO_PIN_RESET);
+    }
+}
+
+/* Function to Set Motor Speed (PWM) */
+void setMotorSpeed(uint16_t speed)
+{
+    if (speed > 100) speed = 100;  // Limit to 100%
+    __HAL_TIM_SET_COMPARE(&htim2, ENA, speed * 10);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = IN1 | IN2;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(MOTOR_PORT, &GPIO_InitStruct);
+}
+
+/* Timer 2 Initialization for PWM */
+static void MX_TIM2_Init(void)
+{
+    __HAL_RCC_TIM2_CLK_ENABLE();
+
+    TIM_OC_InitTypeDef sConfigOC = {0};
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 1600 - 1;  
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 1000 - 1;  
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_PWM_Init(&htim2);
+
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = 0;
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+    HAL_TIM_PWM_ConfigChannel(&htim2, &sConfigOC, ENA);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **IN1 & IN2 Control Motor Direction**.  
+- **PWM on ENA Controls Speed** (0-100%).  
+- **setMotorDirection()** sets forward, reverse, or stop.  
+- **setMotorSpeed()** adjusts PWM duty cycle.  
+- **TIM2 used for PWM Generation**.  
+
+---
+
+### **Expected Output:**  
+- **Motor moves forward (50% speed) for 3s**.  
+- **Motor moves reverse (100% speed) for 3s**.  
+- **Motor stops for 2s**.  
+- **Repeats in a loop**.  
+
+---
+
+### **Next Step: 4-Bit LCD Interfacing**  
+
+### **Step 5: LCD Interfacing (4-bit Mode) with STM32F407**  
+
+#### **Theory:**  
+- **16x2 LCD** works in **8-bit** or **4-bit mode**.  
+- **4-bit mode** reduces **GPIO pin usage**.  
+- Uses **RS, RW, E, and D4-D7** for communication.  
+- **HD44780 controller** handles data display.  
+
+---
+
+### **Practical: Interface 16x2 LCD in 4-bit Mode**  
+#### **Connections:**  
+| LCD Pin | STM32 Pin | Function |
+|---------|----------|----------|
+| **VSS** | **GND** | Ground |
+| **VDD** | **5V** | Power |
+| **V0** | **Potentiometer** | Contrast Adjustment |
+| **RS** | **PA0** | Register Select |
+| **RW** | **GND** | Always Write Mode |
+| **E**  | **PA1** | Enable |
+| **D4** | **PA2** | Data Line |
+| **D5** | **PA3** | Data Line |
+| **D6** | **PA4** | Data Line |
+| **D7** | **PA5** | Data Line |
+
+---
+
+### **Steps to Implement:**  
+1. **Configure GPIO Pins for LCD Control & Data.**  
+2. **Write a function to send commands.**  
+3. **Write a function to send data (characters).**  
+4. **Create a function to display strings.**  
+5. **Initialize LCD and print a message.**  
+
+---
+
+### **Code for 4-bit LCD Interfacing with STM32F407**  
+
+```c
+#include "main.h"
+#include <string.h>
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void LCD_Send_Command(uint8_t cmd);
+void LCD_Send_Char(char data);
+void LCD_Send_String(char *str);
+void LCD_Init(void);
+void LCD_Enable(void);
+
+#define RS GPIO_PIN_0
+#define E  GPIO_PIN_1
+#define D4 GPIO_PIN_2
+#define D5 GPIO_PIN_3
+#define D6 GPIO_PIN_4
+#define D7 GPIO_PIN_5
+#define LCD_PORT GPIOA
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    LCD_Init();  // Initialize LCD
+
+    LCD_Send_String("Hello STM32!");
+    HAL_Delay(2000);
+    LCD_Send_Command(0x01);  // Clear Screen
+    HAL_Delay(1000);
+    LCD_Send_String("4-bit LCD Mode");
+
+    while (1)
+    {
+    }
+}
+
+/* Function to Initialize LCD */
+void LCD_Init(void)
+{
+    HAL_Delay(50);  // Wait for LCD to power up
+    LCD_Send_Command(0x33); // Initialize in 4-bit mode
+    LCD_Send_Command(0x32);
+    LCD_Send_Command(0x28); // 2 lines, 5x8 matrix
+    LCD_Send_Command(0x0C); // Display ON, Cursor OFF
+    LCD_Send_Command(0x06); // Auto-increment cursor
+    LCD_Send_Command(0x01); // Clear screen
+    HAL_Delay(2);
+}
+
+/* Function to Send Commands */
+void LCD_Send_Command(uint8_t cmd)
+{
+    HAL_GPIO_WritePin(LCD_PORT, RS, GPIO_PIN_RESET); // RS = 0 (Command Mode)
+
+    // Send Upper Nibble
+    HAL_GPIO_WritePin(LCD_PORT, D4, (cmd >> 4) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D5, (cmd >> 5) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D6, (cmd >> 6) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D7, (cmd >> 7) & 1);
+    LCD_Enable();
+
+    // Send Lower Nibble
+    HAL_GPIO_WritePin(LCD_PORT, D4, (cmd >> 0) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D5, (cmd >> 1) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D6, (cmd >> 2) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D7, (cmd >> 3) & 1);
+    LCD_Enable();
+}
+
+/* Function to Send Character */
+void LCD_Send_Char(char data)
+{
+    HAL_GPIO_WritePin(LCD_PORT, RS, GPIO_PIN_SET); // RS = 1 (Data Mode)
+
+    // Send Upper Nibble
+    HAL_GPIO_WritePin(LCD_PORT, D4, (data >> 4) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D5, (data >> 5) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D6, (data >> 6) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D7, (data >> 7) & 1);
+    LCD_Enable();
+
+    // Send Lower Nibble
+    HAL_GPIO_WritePin(LCD_PORT, D4, (data >> 0) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D5, (data >> 1) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D6, (data >> 2) & 1);
+    HAL_GPIO_WritePin(LCD_PORT, D7, (data >> 3) & 1);
+    LCD_Enable();
+}
+
+/* Function to Send String */
+void LCD_Send_String(char *str)
+{
+    while (*str)
+    {
+        LCD_Send_Char(*str++);
+    }
+}
+
+/* Function to Enable LCD (Pulse E pin) */
+void LCD_Enable(void)
+{
+    HAL_GPIO_WritePin(LCD_PORT, E, GPIO_PIN_SET);
+    HAL_Delay(1);
+    HAL_GPIO_WritePin(LCD_PORT, E, GPIO_PIN_RESET);
+    HAL_Delay(1);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = RS | E | D4 | D5 | D6 | D7;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LCD_PORT, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **LCD_Init()** → Initializes LCD in 4-bit mode.  
+- **LCD_Send_Command()** → Sends command (e.g., clear screen).  
+- **LCD_Send_Char()** → Sends single character to display.  
+- **LCD_Send_String()** → Prints full string on LCD.  
+- **LCD_Enable()** → Generates a short pulse on **E** pin.  
+
+---
+
+### **Expected Output:**  
+- **"Hello STM32!"** displayed for **2 seconds**.  
+- LCD clears, then shows **"4-bit LCD Mode"**.  
+
+---
+
+### **Next Step: LCD Interfacing Using I2C**  
+
+
+### **Step 6: LCD Interfacing Using I2C with STM32F407**  
+
+#### **Theory:**  
+- I2C reduces the number of GPIO pins needed for LCD interfacing.  
+- Uses an **I2C to LCD module (PCF8574)**, requiring only **SDA** and **SCL**.  
+- Communicates via **7-bit I2C address** (default: **0x27 or 0x3F**).  
+
+---
+
+### **Practical: Interface 16x2 LCD Using I2C**  
+
+#### **Connections:**  
+| LCD I2C Module (PCF8574) | STM32 Pin | Function |
+|-------------------------|----------|----------|
+| **GND**  | **GND**  | Ground |
+| **VCC**  | **5V**   | Power |
+| **SDA**  | **PB7**  | I2C1 Data |
+| **SCL**  | **PB6**  | I2C1 Clock |
+
+---
+
+### **Steps to Implement:**  
+1. **Enable I2C Peripheral in STM32CubeMX.**  
+2. **Initialize I2C Peripheral in Code.**  
+3. **Send Commands & Data to LCD Using I2C.**  
+4. **Display a String on LCD.**  
+
+---
+
+### **Code for LCD Interfacing Using I2C with STM32F407**  
+
+```c
+#include "main.h"
+#include <string.h>
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_I2C1_Init(void);
+void LCD_Init(void);
+void LCD_Send_Command(uint8_t cmd);
+void LCD_Send_Data(uint8_t data);
+void LCD_Send_String(char *str);
+void LCD_Enable(void);
+
+#define LCD_ADDR 0x27 << 1  // I2C address (shifted for write operation)
+#define LCD_BACKLIGHT 0x08  // Backlight ON
+#define ENABLE 0x04         // Enable bit
+
+I2C_HandleTypeDef hi2c1;
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_I2C1_Init();
+
+    LCD_Init();  // Initialize LCD
+
+    LCD_Send_String("Hello STM32 I2C!");
+    HAL_Delay(2000);
+    LCD_Send_Command(0x01);  // Clear Screen
+    HAL_Delay(1000);
+    LCD_Send_String("I2C LCD Interface");
+
+    while (1)
+    {
+    }
+}
+
+/* Function to Initialize LCD */
+void LCD_Init(void)
+{
+    HAL_Delay(50);  // Wait for LCD to power up
+    LCD_Send_Command(0x33); // Initialize in 4-bit mode
+    LCD_Send_Command(0x32);
+    LCD_Send_Command(0x28); // 2 lines, 5x8 matrix
+    LCD_Send_Command(0x0C); // Display ON, Cursor OFF
+    LCD_Send_Command(0x06); // Auto-increment cursor
+    LCD_Send_Command(0x01); // Clear screen
+    HAL_Delay(2);
+}
+
+/* Function to Send Commands */
+void LCD_Send_Command(uint8_t cmd)
+{
+    uint8_t upper_nibble = (cmd & 0xF0) | LCD_BACKLIGHT;
+    uint8_t lower_nibble = ((cmd << 4) & 0xF0) | LCD_BACKLIGHT;
+
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &upper_nibble, 1, HAL_MAX_DELAY);
+    LCD_Enable();
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &lower_nibble, 1, HAL_MAX_DELAY);
+    LCD_Enable();
+}
+
+/* Function to Send Data */
+void LCD_Send_Data(uint8_t data)
+{
+    uint8_t upper_nibble = (data & 0xF0) | LCD_BACKLIGHT | 0x01;
+    uint8_t lower_nibble = ((data << 4) & 0xF0) | LCD_BACKLIGHT | 0x01;
+
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &upper_nibble, 1, HAL_MAX_DELAY);
+    LCD_Enable();
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &lower_nibble, 1, HAL_MAX_DELAY);
+    LCD_Enable();
+}
+
+/* Function to Send String */
+void LCD_Send_String(char *str)
+{
+    while (*str)
+    {
+        LCD_Send_Data(*str++);
+    }
+}
+
+/* Function to Enable LCD (Pulse E bit) */
+void LCD_Enable(void)
+{
+    uint8_t data = ENABLE | LCD_BACKLIGHT;
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &data, 1, HAL_MAX_DELAY);
+    HAL_Delay(1);
+    data &= ~ENABLE;
+    HAL_I2C_Master_Transmit(&hi2c1, LCD_ADDR, &data, 1, HAL_MAX_DELAY);
+    HAL_Delay(1);
+}
+
+/* I2C Initialization */
+static void MX_I2C1_Init(void)
+{
+    hi2c1.Instance = I2C1;
+    hi2c1.Init.ClockSpeed = 100000;
+    hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2;
+    hi2c1.Init.OwnAddress1 = 0;
+    hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+    hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+    hi2c1.Init.OwnAddress2 = 0;
+    hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+    hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+    HAL_I2C_Init(&hi2c1);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **LCD_Init()** → Initializes LCD in **4-bit I2C mode**.  
+- **LCD_Send_Command()** → Sends commands via I2C (e.g., clear screen).  
+- **LCD_Send_Data()** → Sends single character over I2C.  
+- **LCD_Send_String()** → Prints full string on LCD.  
+- **LCD_Enable()** → Sends enable pulse over I2C.  
+
+---
+
+### **Expected Output:**  
+1. **"Hello STM32 I2C!"** displayed for **2 seconds**.  
+2. LCD clears, then shows **"I2C LCD Interface"**.  
+
+---
+
+### **Next Step: UART Communication**  
+
+
+### **Step 7: UART Communication with STM32F407**  
+
+#### **Theory:**  
+- **UART (Universal Asynchronous Receiver-Transmitter)** enables serial communication between STM32 and PC or other devices.  
+- Uses **Tx (PA9) and Rx (PA10)** pins.  
+- Baud rate: **115200 bps** (adjustable).  
+
+---
+
+### **Practical: Send & Receive Data Over UART**  
+
+#### **Connections (Using USB-to-Serial Converter or ST-Link V2)**  
+| STM32F407 Pin | USB-to-Serial (PL2303/CP2102) | Function |
+|--------------|----------------------------|----------|
+| **GND**      | **GND**                      | Ground |
+| **PA9**      | **RXD**                      | UART Transmit (Tx) |
+| **PA10**     | **TXD**                      | UART Receive (Rx) |
+
+---
+
+### **Steps to Implement:**  
+1. **Enable UART Peripheral in STM32CubeMX.**  
+2. **Initialize UART in Code.**  
+3. **Transmit and Receive Data via UART.**  
+4. **Monitor Output Using a Serial Terminal (Tera Term, PuTTY, or RealTerm).**  
+
+---
+
+### **Code for UART Communication with STM32F407**  
+
+```c
+#include "main.h"
+#include <string.h>
+
+UART_HandleTypeDef huart2;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART2_UART_Init(void);
+
+void UART_SendString(char *str);
+void UART_ReceiveString(void);
+
+char rxData[100]; // Buffer to store received data
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_USART2_UART_Init();
+
+    UART_SendString("UART Initialized!\r\n");
+
+    while (1)
+    {
+        UART_SendString("Enter a message: ");
+        UART_ReceiveString();  // Receive input from serial terminal
+        UART_SendString("\r\nReceived: ");
+        UART_SendString(rxData);
+        UART_SendString("\r\n");
+    }
+}
+
+/* Function to Send a String via UART */
+void UART_SendString(char *str)
+{
+    HAL_UART_Transmit(&huart2, (uint8_t *)str, strlen(str), HAL_MAX_DELAY);
+}
+
+/* Function to Receive Data via UART */
+void UART_ReceiveString(void)
+{
+    memset(rxData, 0, sizeof(rxData)); // Clear buffer
+    HAL_UART_Receive(&huart2, (uint8_t *)rxData, sizeof(rxData), HAL_MAX_DELAY);
+}
+
+/* UART2 Initialization */
+static void MX_USART2_UART_Init(void)
+{
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **UART_SendString()** → Sends a string via UART.  
+- **UART_ReceiveString()** → Receives input from UART.  
+- **Uses DMA or polling mode** for data transfer.  
+
+---
+
+### **Expected Output (Serial Terminal at 115200 bps):**  
+```
+UART Initialized!
+Enter a message: 
+```
+- User types **"Hello STM32!"**  
+- Output:  
+  ```
+  Received: Hello STM32!
+  ```
+
+---
+
+### **Next Step: UART with ADC**  
+
+
+### **Step 8: UART with ADC (Analog-to-Digital Conversion) on STM32F407**  
+
+#### **Theory:**  
+- **ADC (Analog to Digital Converter)** converts analog signals (e.g., from a potentiometer) into digital values.  
+- **UART (Universal Asynchronous Receiver-Transmitter)** is used to send the ADC readings to a serial terminal.  
+- ADC resolution: **12-bit (0-4095)** → Voltage range: **0V to 3.3V**  
+
+---
+
+### **Practical: Read ADC & Send Data Over UART**  
+
+#### **Connections (Using a Potentiometer on PA0 - ADC1_IN0)**  
+| STM32F407 Pin | Component | Function |
+|--------------|----------|----------|
+| **PA0**      | Potentiometer (Middle Pin) | ADC Input |
+| **3.3V**     | Potentiometer (VCC) | Power |
+| **GND**      | Potentiometer (GND) | Ground |
+
+#### **Connections for UART (Using USB-to-Serial Converter or ST-Link V2)**  
+| STM32F407 Pin | USB-to-Serial (PL2303/CP2102) | Function |
+|--------------|----------------------------|----------|
+| **GND**      | **GND**                      | Ground |
+| **PA9**      | **RXD**                      | UART Transmit (Tx) |
+| **PA10**     | **TXD**                      | UART Receive (Rx) |
+
+---
+
+### **Steps to Implement:**  
+1. **Enable ADC & UART in STM32CubeMX.**  
+2. **Initialize ADC and UART in Code.**  
+3. **Read ADC value & Convert to Voltage.**  
+4. **Send ADC data over UART.**  
+5. **Monitor ADC readings on Serial Terminal (Tera Term, PuTTY, or RealTerm).**  
+
+---
+
+### **Code for ADC + UART Communication with STM32F407**  
+
+```c
+#include "main.h"
+#include <stdio.h>
+
+ADC_HandleTypeDef hadc1;
+UART_HandleTypeDef huart2;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_ADC1_Init(void);
+static void MX_USART2_UART_Init(void);
+
+uint32_t ADC_Read(void);
+void UART_SendString(char *str);
+
+char buffer[50]; // Buffer for sending ADC value over UART
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_ADC1_Init();
+    MX_USART2_UART_Init();
+
+    UART_SendString("ADC & UART Initialized!\r\n");
+
+    while (1)
+    {
+        uint32_t adcValue = ADC_Read();    // Read ADC value
+        float voltage = (adcValue * 3.3f) / 4095.0f; // Convert to voltage
+
+        sprintf(buffer, "ADC Value: %lu, Voltage: %.2fV\r\n", adcValue, voltage);
+        UART_SendString(buffer); // Send ADC data over UART
+
+        HAL_Delay(1000); // Delay 1 second
+    }
+}
+
+/* Function to Read ADC Value */
+uint32_t ADC_Read(void)
+{
+    HAL_ADC_Start(&hadc1); // Start ADC conversion
+    HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY); // Wait for conversion
+    return HAL_ADC_GetValue(&hadc1); // Get ADC value
+}
+
+/* Function to Send a String via UART */
+void UART_SendString(char *str)
+{
+    HAL_UART_Transmit(&huart2, (uint8_t *)str, strlen(str), HAL_MAX_DELAY);
+}
+
+/* ADC1 Initialization */
+static void MX_ADC1_Init(void)
+{
+    hadc1.Instance = ADC1;
+    hadc1.Init.Resolution = ADC_RESOLUTION_12B;
+    hadc1.Init.ScanConvMode = DISABLE;
+    hadc1.Init.ContinuousConvMode = DISABLE;
+    hadc1.Init.DiscontinuousConvMode = DISABLE;
+    hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+    hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
+    hadc1.Init.NbrOfConversion = 1;
+    HAL_ADC_Init(&hadc1);
+}
+
+/* UART2 Initialization */
+static void MX_USART2_UART_Init(void)
+{
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **ADC_Read()** → Reads ADC value from **PA0 (ADC1_IN0)**.  
+- **Voltage Calculation:**  
+  \[
+  V = \left(\frac{\text{ADC Value} \times 3.3V}{4095}\right)
+  \]
+- **UART_SendString()** → Sends ADC data over UART.  
+- **Data sent every 1 second** using `HAL_Delay(1000)`.  
+
+---
+
+### **Expected Output (Serial Terminal at 115200 bps):**  
+```
+ADC & UART Initialized!
+ADC Value: 2048, Voltage: 1.65V
+ADC Value: 1024, Voltage: 0.83V
+ADC Value: 3072, Voltage: 2.48V
+...
+```
+
+---
+
+### **Next Step: Timer Basics on STM32**  
+
+### **Step 9: Timer Basics on STM32F407**  
+
+#### **Theory:**  
+- **Timers** are used for generating delays, measuring time intervals, and creating periodic events.  
+- STM32F407 has **multiple timers** (TIM1-TIM14).  
+- Timers can operate in **counter mode, PWM mode, or input capture mode**.  
+- **Prescaler & Auto-reload register (ARR)** determine the timer period.  
+
+---
+
+### **Practical: Generate a 1-second delay using TIM2**  
+
+#### **Steps to Implement:**  
+1. **Enable TIM2 in STM32CubeMX** (Clock: 84MHz, Prescaler: 8399, ARR: 9999).  
+2. **Configure the timer in interrupt mode**.  
+3. **Toggle an LED every 1 second** in the timer interrupt handler.  
+
+---
+
+### **Code for Timer-Based LED Blinking**  
+
+```c
+#include "main.h"
+
+TIM_HandleTypeDef htim2;
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_TIM2_Init(void);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_TIM2_Init();
+
+    HAL_TIM_Base_Start_IT(&htim2);  // Start TIM2 in interrupt mode
+
+    while (1)
+    {
+        // Main loop remains empty, as LED toggling is handled in Timer interrupt
+    }
+}
+
+/* Timer2 Interrupt Handler */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM2)
+    {
+        HAL_GPIO_TogglePin(GPIOD, GPIO_PIN_12); // Toggle LED on PD12
+    }
+}
+
+/* TIM2 Initialization */
+static void MX_TIM2_Init(void)
+{
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 8399;  // Set prescaler to 8399
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 9999;  // Set ARR to 9999
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_Base_Init(&htim2);
+    HAL_NVIC_SetPriority(TIM2_IRQn, 1, 0);
+    HAL_NVIC_EnableIRQ(TIM2_IRQn);
+}
+
+/* GPIO Initialization (LED on PD12) */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOD_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_12;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+
+/* Timer2 IRQ Handler */
+void TIM2_IRQHandler(void)
+{
+    HAL_TIM_IRQHandler(&htim2);
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **TIM2 is configured** for a 1-second period:  
+  \[
+  \text{Timer Frequency} = \frac{84 MHz}{(\text{Prescaler} + 1)}
+  \]  
+  \[
+  = \frac{84,000,000}{(8399 + 1)} = 10,000 \text{ Hz}
+  \]
+  \[
+  \text{Timer Period} = \frac{\text{ARR} + 1}{\text{Timer Frequency}} = \frac{10,000}{10,000} = 1 \text{ sec}
+  \]  
+- **Interrupt is triggered every 1 second**, toggling LED **PD12**.  
+- **TIM2_IRQHandler()** calls `HAL_TIM_IRQHandler()` to handle interrupts.  
+
+---
+
+### **Expected Output:**  
+- **LED on PD12 blinks every 1 second** using Timer2.  
+
+---
+
+### **Next Step: PWM Generation using Timer**  
+
+### **Step 10: PWM Generation using Timer on STM32F407**  
+
+#### **Theory:**  
+- **Pulse Width Modulation (PWM)** is used to control the **brightness of LEDs**, **motor speed**, etc.  
+- PWM signal has **variable duty cycle** (percentage of HIGH time in one cycle).  
+- **STM32 Timers** can generate PWM using **Output Compare Mode**.  
+- A **higher duty cycle** means **brighter LED or faster motor speed**.  
+
+---
+
+### **Practical: Generate PWM on TIM3 (Channel 1) to control LED brightness**  
+
+#### **Steps to Implement:**  
+1. **Enable TIM3 and configure PWM mode** in STM32CubeMX.  
+2. **Set PWM frequency and duty cycle** using Prescaler & ARR.  
+3. **Output PWM on GPIO (e.g., PA6 - TIM3 Channel 1)**.  
+4. **Gradually increase/decrease brightness** by modifying duty cycle.  
+
+---
+
+### **Code for LED Brightness Control using PWM**  
+
+```c
+#include "main.h"
+
+TIM_HandleTypeDef htim3;
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_TIM3_Init(void);
+
+int dutyCycle = 0;
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_TIM3_Init();
+
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);  // Start PWM on TIM3 Channel 1
+
+    while (1)
+    {
+        for (dutyCycle = 0; dutyCycle <= 100; dutyCycle += 5)
+        {
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, (dutyCycle * htim3.Init.Period) / 100);
+            HAL_Delay(100);
+        }
+        for (dutyCycle = 100; dutyCycle >= 0; dutyCycle -= 5)
+        {
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, (dutyCycle * htim3.Init.Period) / 100);
+            HAL_Delay(100);
+        }
+    }
+}
+
+/* TIM3 Initialization for PWM */
+static void MX_TIM3_Init(void)
+{
+    htim3.Instance = TIM3;
+    htim3.Init.Prescaler = 83;  // Timer clock = 1 MHz
+    htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim3.Init.Period = 999;  // PWM frequency = 1 kHz
+    htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_PWM_Init(&htim3);
+
+    TIM_OC_InitTypeDef sConfigOC = {0};
+    sConfigOC.OCMode = TIM_OCMODE_PWM1;
+    sConfigOC.Pulse = 0;  // Initial duty cycle = 0%
+    sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+    HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1);
+}
+
+/* GPIO Initialization (PA6 as PWM Output) */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    GPIO_InitStruct.Alternate = GPIO_AF2_TIM3;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **TIM3 is configured in PWM mode** with a **1 kHz frequency** (Prescaler = 83, ARR = 999).  
+- **PA6 is set as PWM output** (TIM3 Channel 1).  
+- **PWM duty cycle** is adjusted from **0% to 100% and back** in a loop.  
+- `__HAL_TIM_SET_COMPARE()` sets the duty cycle dynamically.  
+
+---
+
+### **Expected Output:**  
+- **LED brightness gradually increases and decreases** continuously.  
+
+---
+
+### **Next Step: Interrupts (Internal & Timer Interrupts)**  
+
+
+### **Step 11: Interrupts (Internal & Timer Interrupts) on STM32F407**  
+
+#### **Theory:**  
+- **Interrupts** allow the MCU to respond to events without constantly checking (polling).  
+- **Types of Interrupts in STM32:**  
+  1. **External Interrupts (e.g., Button Press - EXTI)**  
+  2. **Timer Interrupts (e.g., Periodic tasks using TIMx)**  
+  3. **Peripheral Interrupts (e.g., UART, ADC, I2C, etc.)**  
+- **NVIC (Nested Vector Interrupt Controller)** manages **priority and handling**.  
+
+---
+
+### **Practical 1: External Interrupt using Push Button (PA0) to Toggle LED**  
+
+#### **Steps to Implement:**  
+1. **Enable GPIOA and configure PA0 as an EXTI interrupt pin**.  
+2. **Enable EXTI0 in NVIC and attach an ISR (Interrupt Service Routine)**.  
+3. **Toggle LED (PA5) whenever the button is pressed**.  
+
+---
+
+### **Code for External Interrupt (Button Press)**
+```c
+#include "main.h"
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    while (1)
+    {
+        // Main loop does nothing, waiting for button interrupt
+    }
+}
+
+/* Interrupt Callback Function */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_0)
+    {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle LED
+    }
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    // Configure LED pin (PA5) as output
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Configure Button pin (PA0) as EXTI interrupt
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Enable Interrupt in NVIC
+    HAL_NVIC_SetPriority(EXTI0_IRQn, 2, 0);
+    HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+}
+
+/* EXTI ISR Handler */
+void EXTI0_IRQHandler(void)
+{
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **PA0 is configured as an external interrupt (EXTI0)**.  
+- **LED on PA5 toggles** when the button is pressed.  
+- **NVIC enables EXTI0 interrupt with priority 2**.  
+- **HAL_GPIO_EXTI_Callback() is triggered on button press**.  
+
+---
+
+### **Expected Output:**  
+- **LED (PA5) toggles ON/OFF whenever the button (PA0) is pressed**.  
+
+---
+
+## **Practical 2: Timer Interrupt using TIM2 (1s Interval Blinking LED)**
+### **Steps to Implement:**  
+1. **Enable TIM2 and configure it to trigger an interrupt every 1s**.  
+2. **Enable TIM2 in NVIC and attach an ISR**.  
+3. **Toggle LED (PA5) inside the ISR**.  
+
+---
+
+### **Code for Timer Interrupt (TIM2 - 1s Blink)**
+```c
+#include "main.h"
+
+TIM_HandleTypeDef htim2;
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_TIM2_Init(void);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_TIM2_Init();
+
+    HAL_TIM_Base_Start_IT(&htim2);  // Start Timer Interrupt
+
+    while (1)
+    {
+        // Main loop does nothing, LED blinks in ISR
+    }
+}
+
+/* Timer Interrupt Callback Function */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+    if (htim->Instance == TIM2)
+    {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle LED every 1s
+    }
+}
+
+/* TIM2 Initialization */
+static void MX_TIM2_Init(void)
+{
+    htim2.Instance = TIM2;
+    htim2.Init.Prescaler = 8399;  // 84 MHz / (8399 + 1) = 10 kHz
+    htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+    htim2.Init.Period = 9999;  // 10 kHz / (9999 + 1) = 1 Hz (1s)
+    htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+    HAL_TIM_Base_Init(&htim2);
+
+    // Enable Timer Interrupt
+    HAL_NVIC_SetPriority(TIM2_IRQn, 2, 0);
+    HAL_NVIC_EnableIRQ(TIM2_IRQn);
+}
+
+/* TIM2 ISR Handler */
+void TIM2_IRQHandler(void)
+{
+    HAL_TIM_IRQHandler(&htim2);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **TIM2 is configured to generate an interrupt every 1 second**.  
+- **ISR toggles LED on PA5 when the timer interrupt occurs**.  
+- **NVIC enables TIM2 interrupt with priority 2**.  
+
+---
+
+### **Expected Output:**  
+- **LED blinks every 1 second automatically** using the timer interrupt.  
+
+---
+
+## **Summary of Interrupt Examples**
+| Example | Interrupt Type | Trigger Event | Action |
+|---------|---------------|--------------|--------|
+| **Button Press** | **External (EXTI0)** | Rising Edge on PA0 | Toggle LED |
+| **Timer Interrupt** | **TIM2 Update Event** | Every 1 second | Toggle LED |
+
+---
+
+### **Next Step: FreeRTOS Task Scheduling on STM32**
+
+
+### **Step 12: FreeRTOS Basics on STM32F407**  
+
+#### **Theory:**  
+- **FreeRTOS** is a real-time operating system (RTOS) that manages tasks efficiently.  
+- **Key FreeRTOS Components:**  
+  1. **Tasks** – Independent functions running in parallel.  
+  2. **Task Scheduling** – Determines task execution order (Preemptive or Cooperative).  
+  3. **Semaphores** – Used for task synchronization.  
+  4. **Queues** – Used for inter-task communication.  
+  5. **Memory Management** – Dynamic allocation using Heap_1 to Heap_5.  
+
+---
+
+### **Practical 1: Creating Two FreeRTOS Tasks**
+**Objective:** Create two tasks that blink two LEDs at different intervals.  
+
+#### **Steps to Implement:**
+1. **Initialize FreeRTOS and create two tasks.**  
+2. **One task blinks LED1 every 500ms.**  
+3. **Another task blinks LED2 every 1000ms.**  
+4. **Start the FreeRTOS scheduler.**  
+
+---
+
+### **Code for Creating Two FreeRTOS Tasks**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void LED_Task1(void *pvParameters);
+void LED_Task2(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    // Create Task 1 - LED1 Blink (500ms)
+    xTaskCreate(LED_Task1, "LED1", 128, NULL, 1, NULL);
+
+    // Create Task 2 - LED2 Blink (1000ms)
+    xTaskCreate(LED_Task2, "LED2", 128, NULL, 1, NULL);
+
+    // Start FreeRTOS Scheduler
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task 1: LED1 Blink Every 500ms */
+void LED_Task1(void *pvParameters)
+{
+    while (1)
+    {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle LED1
+        vTaskDelay(pdMS_TO_TICKS(500));       // Delay 500ms
+    }
+}
+
+/* Task 2: LED2 Blink Every 1000ms */
+void LED_Task2(void *pvParameters)
+{
+    while (1)
+    {
+        HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_6); // Toggle LED2
+        vTaskDelay(pdMS_TO_TICKS(1000));       // Delay 1000ms
+    }
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Configure LED1 (PA5)
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Configure LED2 (PA6)
+    GPIO_InitStruct.Pin = GPIO_PIN_6;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **xTaskCreate()** creates two tasks:  
+  - **LED_Task1:** Blinks LED1 every **500ms**.  
+  - **LED_Task2:** Blinks LED2 every **1000ms**.  
+- **vTaskDelay(pdMS_TO_TICKS(x))** suspends the task for `x` milliseconds.  
+- **vTaskStartScheduler()** starts FreeRTOS task management.  
+
+---
+
+### **Expected Output:**  
+- **LED1 (PA5) blinks every 500ms.**  
+- **LED2 (PA6) blinks every 1000ms.**  
+
+---
+
+## **Practical 2: Task Synchronization Using a Semaphore**
+### **Objective:**  
+- Use a **binary semaphore** to synchronize task execution.  
+- **Button Press (PA0) triggers LED blinking.**  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a binary semaphore.**  
+2. **One task waits for the semaphore signal.**  
+3. **Button press (EXTI) releases the semaphore.**  
+4. **LED toggles on receiving semaphore.**  
+
+---
+
+### **Code for Task Synchronization Using Semaphore**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void LED_Task(void *pvParameters);
+SemaphoreHandle_t xBinarySemaphore;
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    // Create a binary semaphore
+    xBinarySemaphore = xSemaphoreCreateBinary();
+
+    // Create LED task
+    xTaskCreate(LED_Task, "LED_Task", 128, NULL, 1, NULL);
+
+    // Start FreeRTOS Scheduler
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* LED Task - Waits for Semaphore */
+void LED_Task(void *pvParameters)
+{
+    while (1)
+    {
+        if (xSemaphoreTake(xBinarySemaphore, portMAX_DELAY) == pdTRUE)
+        {
+            HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle LED
+        }
+    }
+}
+
+/* Button Interrupt Callback */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_0)
+    {
+        xSemaphoreGiveFromISR(xBinarySemaphore, NULL);
+    }
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Configure LED (PA5)
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Configure Button (PA0)
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Enable EXTI0 interrupt
+    HAL_NVIC_SetPriority(EXTI0_IRQn, 2, 0);
+    HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+}
+
+/* EXTI ISR */
+void EXTI0_IRQHandler(void)
+{
+    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_0);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **xSemaphoreCreateBinary()** creates a binary semaphore.  
+- **LED_Task() waits for semaphore** (blocks until button press).  
+- **Button Press (PA0) triggers EXTI0, which gives the semaphore**.  
+- **Semaphore release unblocks LED_Task(), toggling the LED**.  
+
+---
+
+### **Expected Output:**  
+- **LED blinks once whenever the button (PA0) is pressed**.  
+
+---
+
+## **Summary of FreeRTOS Examples**
+| Example | FreeRTOS Feature | Description |
+|---------|-----------------|-------------|
+| **Two Tasks** | **Task Scheduling** | LED1 (500ms), LED2 (1000ms) |
+| **Button Press LED** | **Binary Semaphore** | Button triggers LED toggle |
+
+---
+
+### **Next Step: FreeRTOS Queues for Inter-Task Communication**  
+
+
+### **Step 13: FreeRTOS Queues for Inter-Task Communication**  
+
+#### **Theory:**  
+- **Queues in FreeRTOS** are used to **pass messages between tasks**.  
+- A queue is a **FIFO (First In, First Out) buffer** for storing and retrieving data.  
+- **Common Use Cases:**  
+  - Sending sensor data from **ADC Task** to **Processing Task**.  
+  - Communicating between **UART Task** and **Main Task**.  
+  - Passing commands between tasks.  
+
+---
+
+### **Practical: Using FreeRTOS Queue for Inter-Task Communication**  
+#### **Objective:**  
+- Create **Task 1 (Sender)** that **sends a number to a queue** every second.  
+- Create **Task 2 (Receiver)** that **receives and prints the number** over UART.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a queue** to hold integer values.  
+2. **Task 1 (Sender)** sends a **counter value** to the queue every 1000ms.  
+3. **Task 2 (Receiver)** reads the queue and **sends the value over UART**.  
+4. **Start FreeRTOS scheduler**.  
+
+---
+
+### **Code for FreeRTOS Queue Example**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+#include "stdio.h"
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART2_UART_Init(void);
+void Sender_Task(void *pvParameters);
+void Receiver_Task(void *pvParameters);
+
+UART_HandleTypeDef huart2;
+QueueHandle_t xQueue;
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_USART2_UART_Init();
+
+    // Create a queue of size 5 (storing int values)
+    xQueue = xQueueCreate(5, sizeof(int));
+
+    if (xQueue != NULL)
+    {
+        // Create Sender Task
+        xTaskCreate(Sender_Task, "Sender", 128, NULL, 1, NULL);
+        // Create Receiver Task
+        xTaskCreate(Receiver_Task, "Receiver", 128, NULL, 1, NULL);
+
+        // Start FreeRTOS Scheduler
+        vTaskStartScheduler();
+    }
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Sender Task: Sends a counter value to the queue */
+void Sender_Task(void *pvParameters)
+{
+    int count = 0;
+    while (1)
+    {
+        count++;
+        xQueueSend(xQueue, &count, portMAX_DELAY); // Send count to queue
+        vTaskDelay(pdMS_TO_TICKS(1000));          // Delay 1 sec
+    }
+}
+
+/* Receiver Task: Reads from queue and prints to UART */
+void Receiver_Task(void *pvParameters)
+{
+    int receivedValue;
+    char msg[50];
+
+    while (1)
+    {
+        if (xQueueReceive(xQueue, &receivedValue, portMAX_DELAY) == pdTRUE)
+        {
+            sprintf(msg, "Received: %d\r\n", receivedValue);
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        }
+    }
+}
+
+/* UART2 Initialization */
+static void MX_USART2_UART_Init(void)
+{
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **xQueueCreate(5, sizeof(int))** creates a queue to hold **5 integers**.  
+- **Sender_Task()** increments a counter and sends it to the queue every **1000ms**.  
+- **Receiver_Task()** waits for a new value, reads it, and sends it over **UART2**.  
+- **HAL_UART_Transmit()** prints received values on a terminal.  
+
+---
+
+### **Expected Output (UART Terminal, Baud 115200)**  
+```
+Received: 1
+Received: 2
+Received: 3
+...
+```
+
+---
+
+### **Summary of FreeRTOS Queue Example**  
+| **Component** | **Function** |
+|--------------|-------------|
+| **Queue** | Stores integer values |
+| **Sender Task** | Sends counter values every second |
+| **Receiver Task** | Reads queue and prints via UART |
+
+---
+
+## **Next Step: FreeRTOS Memory Management (Dynamic Allocation)**  
+
+### **Step 14: FreeRTOS Memory Management (Dynamic Allocation)**  
+
+#### **Theory:**  
+- FreeRTOS provides different memory allocation methods to manage **heap usage**.  
+- Common memory management schemes in FreeRTOS:  
+  1. **heap_1:** Simple allocation (no freeing).  
+  2. **heap_2:** Allows freeing but not memory fragmentation handling.  
+  3. **heap_3:** Uses C’s **malloc()** and **free()**.  
+  4. **heap_4:** Best for embedded, with **memory defragmentation**.  
+  5. **heap_5:** Similar to heap_4 but allows **multiple memory regions**.  
+
+---
+
+### **Practical: Allocating and Freeing Memory Dynamically**  
+#### **Objective:**  
+- Allocate memory dynamically for an array inside a task.  
+- Use **pvPortMalloc()** (FreeRTOS equivalent of malloc).  
+- Free memory using **vPortFree()**.  
+- Print results over UART.
+
+---
+
+### **Steps to Implement:**  
+1. Create a **Task** that dynamically allocates an array.  
+2. Check if memory allocation was successful.  
+3. Use the memory (store and print values).  
+4. Free the allocated memory.  
+5. Repeat allocation after a delay.  
+
+---
+
+### **Code for FreeRTOS Dynamic Memory Allocation**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "stdio.h"
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART2_UART_Init(void);
+void Memory_Task(void *pvParameters);
+
+UART_HandleTypeDef huart2;
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_USART2_UART_Init();
+
+    // Create a task to test dynamic memory allocation
+    xTaskCreate(Memory_Task, "MemoryTest", 256, NULL, 1, NULL);
+
+    // Start FreeRTOS Scheduler
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task to test FreeRTOS dynamic memory allocation */
+void Memory_Task(void *pvParameters)
+{
+    char msg[50];
+
+    while (1)
+    {
+        // Allocate memory for an array of 10 integers
+        int *arr = (int *)pvPortMalloc(10 * sizeof(int));
+
+        if (arr == NULL)
+        {
+            sprintf(msg, "Memory Allocation Failed!\r\n");
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        }
+        else
+        {
+            // Assign values and print them
+            for (int i = 0; i < 10; i++)
+            {
+                arr[i] = i * 10;
+                sprintf(msg, "arr[%d] = %d\r\n", i, arr[i]);
+                HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+            }
+
+            // Free allocated memory
+            vPortFree(arr);
+            sprintf(msg, "Memory Freed\r\n");
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        }
+
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Wait 2 seconds before next allocation
+    }
+}
+
+/* UART2 Initialization */
+static void MX_USART2_UART_Init(void)
+{
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+- **pvPortMalloc(10 * sizeof(int))** dynamically allocates an array of **10 integers**.  
+- If allocation fails, it prints **"Memory Allocation Failed!"**.  
+- The program assigns **values to the array** and prints them over **UART**.  
+- **vPortFree(arr)** releases the allocated memory.  
+- **Task repeats allocation every 2 seconds**.  
+
+---
+
+### **Expected Output (UART Terminal, Baud 115200)**  
+```
+arr[0] = 0
+arr[1] = 10
+arr[2] = 20
+...
+arr[9] = 90
+Memory Freed
+```
+
+---
+
+### **Summary of FreeRTOS Memory Management**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **pvPortMalloc()** | Allocates memory dynamically |
+| **vPortFree()** | Frees allocated memory |
+| **heap_4** | Best choice for FreeRTOS |
+
+---
+
+## **Next Step: FreeRTOS Mutex for Task Synchronization**  
+
+
+### **Step 15: FreeRTOS Mutex for Task Synchronization**  
+
+#### **Theory:**  
+- **Mutex (Mutual Exclusion)** is used to prevent **race conditions** when multiple tasks access a shared resource.  
+- Unlike binary semaphores, **Mutexes** support **priority inheritance**, reducing priority inversion problems.  
+- A Mutex is locked using **xSemaphoreTake()** and released using **xSemaphoreGive()**.  
+
+---
+
+### **Practical: Synchronizing UART Access with a Mutex**  
+#### **Objective:**  
+- Create **two tasks** that print messages over **UART**.  
+- Use a **Mutex** to ensure **only one task** prints at a time.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a Mutex** before starting the scheduler.  
+2. **Two tasks (Task1 and Task2)** will try to print over **UART**.  
+3. Each task will **take the Mutex**, print a message, **release the Mutex**, and then delay.  
+4. The Mutex ensures **messages don't mix up in UART output**.  
+
+---
+
+### **Code for FreeRTOS Mutex Synchronization**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+#include "stdio.h"
+
+UART_HandleTypeDef huart2;
+SemaphoreHandle_t uartMutex;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART2_UART_Init(void);
+void Task1(void *pvParameters);
+void Task2(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_USART2_UART_Init();
+
+    // Create Mutex before starting tasks
+    uartMutex = xSemaphoreCreateMutex();
+
+    if (uartMutex != NULL)
+    {
+        // Create tasks
+        xTaskCreate(Task1, "Task1", 256, NULL, 1, NULL);
+        xTaskCreate(Task2, "Task2", 256, NULL, 1, NULL);
+
+        // Start FreeRTOS Scheduler
+        vTaskStartScheduler();
+    }
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task 1 - Prints a message using Mutex */
+void Task1(void *pvParameters)
+{
+    char msg[50];
+    while (1)
+    {
+        if (xSemaphoreTake(uartMutex, portMAX_DELAY) == pdTRUE)
+        {
+            sprintf(msg, "Task 1 is running\r\n");
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+            xSemaphoreGive(uartMutex); // Release Mutex
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay 1 second
+    }
+}
+
+/* Task 2 - Prints a message using Mutex */
+void Task2(void *pvParameters)
+{
+    char msg[50];
+    while (1)
+    {
+        if (xSemaphoreTake(uartMutex, portMAX_DELAY) == pdTRUE)
+        {
+            sprintf(msg, "Task 2 is running\r\n");
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+            xSemaphoreGive(uartMutex); // Release Mutex
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay 1 second
+    }
+}
+
+/* UART2 Initialization */
+static void MX_USART2_UART_Init(void)
+{
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Mutex** using `xSemaphoreCreateMutex()`.  
+2. **Task1 and Task2** both attempt to print a message over **UART**.  
+3. Each task **takes the Mutex**, prints, then **releases the Mutex**.  
+4. **Ensures only one task prints at a time**, avoiding mixed-up messages.  
+
+---
+
+### **Expected Output (UART Terminal, Baud 115200)**  
+```
+Task 1 is running
+Task 2 is running
+Task 1 is running
+Task 2 is running
+...
+```
+
+---
+
+### **Summary of FreeRTOS Mutexes**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xSemaphoreCreateMutex()** | Creates a Mutex |
+| **xSemaphoreTake()** | Locks (takes) the Mutex |
+| **xSemaphoreGive()** | Unlocks (releases) the Mutex |
+
+---
+
+## **Next Step: FreeRTOS Counting Semaphore for Event Handling**  
+
+
+### **Step 16: FreeRTOS Counting Semaphore for Event Synchronization**  
+
+#### **Theory:**  
+- A **Counting Semaphore** is used when multiple instances of an event need to be counted (e.g., button presses, sensor triggers).  
+- Unlike a binary semaphore (which allows only 0 or 1), a counting semaphore **increments and decrements** within a set limit.  
+- Tasks can **wait** for a specific count and process events when the count is available.  
+
+---
+
+### **Practical: Counting Button Presses Using Semaphore**  
+#### **Objective:**  
+- Use an **external push button** to **increase a counting semaphore**.  
+- A task will **process** the button presses whenever it detects an event.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a counting semaphore** before the scheduler starts.  
+2. **Configure an external interrupt (EXTI) for the button press.**  
+3. **Interrupt Handler (ISR) will increment the semaphore count.**  
+4. **A task waits for the semaphore count to process button presses.**  
+
+---
+
+### **Code for FreeRTOS Counting Semaphore (Button Press Handler)**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+#include "stdio.h"
+
+UART_HandleTypeDef huart2;
+SemaphoreHandle_t buttonSemaphore;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART2_UART_Init(void);
+void ButtonTask(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_USART2_UART_Init();
+
+    // Create Counting Semaphore (max count 5, initial count 0)
+    buttonSemaphore = xSemaphoreCreateCounting(5, 0);
+
+    if (buttonSemaphore != NULL)
+    {
+        // Create Task
+        xTaskCreate(ButtonTask, "ButtonTask", 256, NULL, 1, NULL);
+
+        // Start FreeRTOS Scheduler
+        vTaskStartScheduler();
+    }
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task to Process Button Press Events */
+void ButtonTask(void *pvParameters)
+{
+    char msg[50];
+    while (1)
+    {
+        // Wait for a button press event
+        if (xSemaphoreTake(buttonSemaphore, portMAX_DELAY) == pdTRUE)
+        {
+            sprintf(msg, "Button Press Detected!\r\n");
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        }
+    }
+}
+
+/* External Interrupt Callback (Triggered on Button Press) */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    if (GPIO_Pin == GPIO_PIN_0) // Check if it's the button pin
+    {
+        xSemaphoreGiveFromISR(buttonSemaphore, NULL); // Increment the semaphore
+    }
+}
+
+/* GPIO Initialization (Button on PA0, EXTI Interrupt) */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING; // Interrupt on Rising Edge
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // Enable EXTI Interrupt in NVIC
+    HAL_NVIC_SetPriority(EXTI0_IRQn, 5, 0);
+    HAL_NVIC_EnableIRQ(EXTI0_IRQn);
+}
+
+/* UART2 Initialization */
+static void MX_USART2_UART_Init(void)
+{
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Counting Semaphore** using `xSemaphoreCreateCounting(5, 0)`.  
+   - Max count = **5** (stores up to 5 events).  
+   - Initial count = **0** (no events initially).  
+2. **EXTI Interrupt Handler** (`HAL_GPIO_EXTI_Callback`) increments the semaphore when the button is pressed.  
+3. **Button Task** waits for the semaphore and prints a message each time a button press is detected.  
+
+---
+
+### **Expected Output (UART Terminal, Baud 115200)**  
+```
+Button Press Detected!
+Button Press Detected!
+Button Press Detected!
+...
+```
+
+---
+
+### **Summary of FreeRTOS Counting Semaphore**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xSemaphoreCreateCounting(max, initial)** | Creates a counting semaphore |
+| **xSemaphoreGive()** | Increments the semaphore count |
+| **xSemaphoreTake()** | Decrements the semaphore count |
+| **xSemaphoreGiveFromISR()** | Used in Interrupts to signal an event |
+
+---
+
+## **Next Step: FreeRTOS Software Timers for Periodic Tasks**  
+
+
+### **Step 17: FreeRTOS Software Timers for Periodic Tasks**  
+
+#### **Theory:**  
+- **Software Timers** in FreeRTOS allow you to execute a function **periodically** or **after a delay** without blocking the CPU.  
+- Unlike **hardware timers**, they run **within the FreeRTOS kernel** and do not require dedicated MCU timers.  
+- Can be **one-shot** (runs once) or **auto-reload** (repeats after a period).  
+- Used for **periodic events** like blinking an LED, monitoring a sensor, or timeout handling.  
+
+---
+
+### **Practical: Blinking an LED Using a FreeRTOS Software Timer**  
+#### **Objective:**  
+- Create a **software timer** to toggle an LED **every 1 second**.  
+- Use **Auto-Reload mode** to make it run continuously.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a Software Timer** before the scheduler starts.  
+2. **Define a Timer Callback Function** that toggles the LED.  
+3. **Start the Timer** when the scheduler starts.  
+4. **Observe the LED blinking periodically.**  
+
+---
+
+### **Code for FreeRTOS Software Timer (LED Blinker)**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+
+#define LED_PIN GPIO_PIN_13
+#define LED_PORT GPIOC
+
+TimerHandle_t ledTimerHandle;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void LED_Timer_Callback(TimerHandle_t xTimer);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    // Create a software timer (Auto-Reload mode, period = 1000ms)
+    ledTimerHandle = xTimerCreate("LED Timer", pdMS_TO_TICKS(1000), pdTRUE, (void *)0, LED_Timer_Callback);
+
+    if (ledTimerHandle != NULL)
+    {
+        xTimerStart(ledTimerHandle, 0); // Start the timer
+    }
+
+    vTaskStartScheduler(); // Start FreeRTOS
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Timer Callback Function (Executed every 1 sec) */
+void LED_Timer_Callback(TimerHandle_t xTimer)
+{
+    HAL_GPIO_TogglePin(LED_PORT, LED_PIN); // Toggle LED
+}
+
+/* GPIO Initialization (LED on PC13) */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = LED_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Software Timer** using `xTimerCreate()` with:  
+   - **Timer Name:** `"LED Timer"`  
+   - **Period:** `1000ms` (1 second)  
+   - **Auto-Reload:** `pdTRUE` (runs continuously)  
+   - **Callback Function:** `LED_Timer_Callback()`  
+2. **Start the Timer** using `xTimerStart()` before the scheduler starts.  
+3. **Timer Callback Function** toggles the LED every second.  
+4. **LED blinks periodically** without blocking other tasks.  
+
+---
+
+### **Expected Behavior:**  
+- The LED on **PC13** will blink every **1 second**.  
+
+---
+
+### **Summary of FreeRTOS Software Timers**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xTimerCreate(name, period, auto-reload, id, callback)** | Creates a software timer |
+| **xTimerStart(timer, timeout)** | Starts the timer |
+| **xTimerStop(timer, timeout)** | Stops the timer |
+| **xTimerChangePeriod(timer, newPeriod, timeout)** | Changes the timer period |
+| **xTimerReset(timer, timeout)** | Resets the timer |
+
+---
+
+## **Next Step: FreeRTOS Event Groups for Multi-task Synchronization**  
+
+
+### **Step 18: FreeRTOS Event Groups for Multi-Task Synchronization**  
+
+#### **Theory:**  
+- **Event Groups** in FreeRTOS allow tasks to synchronize using **bit flags** (similar to binary semaphores but more flexible).  
+- Multiple tasks can **set, wait for, or clear specific bits** in an event group.  
+- Useful for **task synchronization, signaling, and multi-event handling**.  
+
+---
+
+### **Practical: Synchronizing Two Tasks Using an Event Group**  
+#### **Objective:**  
+- **Task 1:** Sets a bit in an event group every 2 seconds.  
+- **Task 2:** Waits for the event and toggles an LED when the event occurs.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create an Event Group** before the scheduler starts.  
+2. **Task 1:** Sets a specific bit in the event group every 2 seconds.  
+3. **Task 2:** Waits for the bit to be set, toggles an LED, and clears the bit.  
+
+---
+
+### **Code for FreeRTOS Event Groups**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "event_groups.h"
+
+#define LED_PIN GPIO_PIN_13
+#define LED_PORT GPIOC
+#define EVENT_BIT (1 << 0) // Define event bit 0
+
+EventGroupHandle_t eventGroupHandle;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void Task1_SetEvent(void *pvParameters);
+void Task2_WaitEvent(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    // Create an Event Group
+    eventGroupHandle = xEventGroupCreate();
+
+    // Create two tasks
+    xTaskCreate(Task1_SetEvent, "Task 1", 128, NULL, 1, NULL);
+    xTaskCreate(Task2_WaitEvent, "Task 2", 128, NULL, 2, NULL);
+
+    vTaskStartScheduler(); // Start FreeRTOS
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task 1: Sets the Event Bit every 2 seconds */
+void Task1_SetEvent(void *pvParameters)
+{
+    while (1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Wait for 2 seconds
+        xEventGroupSetBits(eventGroupHandle, EVENT_BIT); // Set event bit
+    }
+}
+
+/* Task 2: Waits for the Event Bit and Toggles LED */
+void Task2_WaitEvent(void *pvParameters)
+{
+    while (1)
+    {
+        xEventGroupWaitBits(eventGroupHandle, EVENT_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
+        HAL_GPIO_TogglePin(LED_PORT, LED_PIN); // Toggle LED
+    }
+}
+
+/* GPIO Initialization (LED on PC13) */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = LED_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create an Event Group** using `xEventGroupCreate()`.  
+2. **Task 1:** Uses `xEventGroupSetBits()` to **set a bit** in the event group every 2 seconds.  
+3. **Task 2:** Uses `xEventGroupWaitBits()` to **wait for the bit**, toggles an LED, and clears the bit.  
+4. **The LED blinks every 2 seconds** when Task 2 detects the event.  
+
+---
+
+### **Expected Behavior:**  
+- Every **2 seconds**, the LED **toggles** when Task 2 detects the event.  
+
+---
+
+### **Summary of FreeRTOS Event Groups**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xEventGroupCreate()** | Creates an event group |
+| **xEventGroupSetBits(eventGroup, bitsToSet)** | Sets specific bits in an event group |
+| **xEventGroupClearBits(eventGroup, bitsToClear)** | Clears specific bits |
+| **xEventGroupWaitBits(eventGroup, bitsToWaitFor, clearOnExit, waitForAll, timeout)** | Waits for bits to be set |
+
+---
+
+## **Next Step: FreeRTOS Message Queues for Task Communication**  
+
+
+### **Step 19: FreeRTOS Message Queues for Task Communication**  
+
+#### **Theory:**  
+- **Message Queues** in FreeRTOS allow tasks to exchange data safely.  
+- One task **sends data** into the queue, and another task **receives it**.  
+- Queues store **multiple messages** in FIFO (First-In-First-Out) order.  
+- Useful for **task synchronization and inter-task communication**.  
+
+---
+
+### **Practical: Sending and Receiving Data Between Two Tasks Using a Queue**  
+#### **Objective:**  
+- **Task 1:** Sends an **incrementing number** every second.  
+- **Task 2:** Reads the number and **toggles an LED** if the number is even.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a Queue** before the scheduler starts.  
+2. **Task 1:** Puts an integer into the queue every second.  
+3. **Task 2:** Reads the integer from the queue and toggles an LED if the value is even.  
+
+---
+
+### **Code for FreeRTOS Message Queue**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+
+#define LED_PIN GPIO_PIN_13
+#define LED_PORT GPIOC
+
+QueueHandle_t messageQueue;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void Task1_Send(void *pvParameters);
+void Task2_Receive(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    // Create a queue to store integers (each message is sizeof(int))
+    messageQueue = xQueueCreate(5, sizeof(int));
+
+    // Create two tasks
+    xTaskCreate(Task1_Send, "Task 1", 128, NULL, 1, NULL);
+    xTaskCreate(Task2_Receive, "Task 2", 128, NULL, 2, NULL);
+
+    vTaskStartScheduler(); // Start FreeRTOS
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task 1: Sends an incrementing number to the queue */
+void Task1_Send(void *pvParameters)
+{
+    int count = 0;
+    while (1)
+    {
+        count++; // Increment count
+        xQueueSend(messageQueue, &count, portMAX_DELAY); // Send data to queue
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Wait for 1 second
+    }
+}
+
+/* Task 2: Receives data from the queue and toggles LED if even */
+void Task2_Receive(void *pvParameters)
+{
+    int receivedValue;
+    while (1)
+    {
+        if (xQueueReceive(messageQueue, &receivedValue, portMAX_DELAY) == pdTRUE)
+        {
+            if (receivedValue % 2 == 0) // Check if even
+            {
+                HAL_GPIO_TogglePin(LED_PORT, LED_PIN); // Toggle LED
+            }
+        }
+    }
+}
+
+/* GPIO Initialization (LED on PC13) */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = LED_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Queue** using `xQueueCreate(5, sizeof(int))`.  
+2. **Task 1:** Uses `xQueueSend()` to send an incrementing number every second.  
+3. **Task 2:** Uses `xQueueReceive()` to read the number and **toggles the LED** if it is even.  
+
+---
+
+### **Expected Behavior:**  
+- **Every second**, Task 1 sends an incrementing number to the queue.  
+- Task 2 reads the number and toggles the LED **only if the number is even**.  
+
+---
+
+### **Summary of FreeRTOS Queue Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xQueueCreate(length, itemSize)** | Creates a queue |
+| **xQueueSend(queue, &data, timeout)** | Sends data to the queue |
+| **xQueueReceive(queue, &buffer, timeout)** | Reads data from the queue |
+
+---
+
+## **Next Step: FreeRTOS Timers for Periodic Tasks**  
+
+
+### **Step 20: FreeRTOS Software Timers for Periodic Tasks**  
+
+#### **Theory:**  
+- FreeRTOS **software timers** allow functions to execute **periodically** without needing a dedicated task.  
+- Timers run in the **background** using the FreeRTOS **timer service task**.  
+- There are **one-shot timers** (execute once) and **periodic timers** (execute repeatedly).  
+- Useful for **blinking an LED**, **monitoring sensors**, or **triggering events at fixed intervals**.
+
+---
+
+### **Practical: Blink LED Every 500ms Using a FreeRTOS Timer**  
+#### **Objective:**  
+- Create a **FreeRTOS software timer** that **toggles an LED** every 500ms.
+
+---
+
+### **Steps to Implement:**  
+1. **Create a timer** before starting the scheduler.  
+2. **Set the timer period** to **500ms** (for LED blinking).  
+3. **Start the timer** inside `main()`.  
+4. **Define the timer callback function** to toggle the LED.  
+
+---
+
+### **Code for FreeRTOS Timer**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+
+#define LED_PIN GPIO_PIN_13
+#define LED_PORT GPIOC
+
+TimerHandle_t LEDTimer;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void LED_Timer_Callback(TimerHandle_t xTimer);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    // Create a software timer (500ms interval, auto-reload mode)
+    LEDTimer = xTimerCreate("LED Timer", pdMS_TO_TICKS(500), pdTRUE, 0, LED_Timer_Callback);
+
+    if (LEDTimer != NULL)
+    {
+        xTimerStart(LEDTimer, 0); // Start the timer
+    }
+
+    vTaskStartScheduler(); // Start FreeRTOS
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Timer Callback Function */
+void LED_Timer_Callback(TimerHandle_t xTimer)
+{
+    HAL_GPIO_TogglePin(LED_PORT, LED_PIN); // Toggle LED
+}
+
+/* GPIO Initialization (LED on PC13) */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = LED_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Timer** using `xTimerCreate()`, with:
+   - **500ms period** (`pdMS_TO_TICKS(500)`)
+   - **Auto-reload enabled** (`pdTRUE`)
+   - **Callback function** `LED_Timer_Callback()`
+2. **Start the Timer** using `xTimerStart()`.
+3. **Timer Callback Function** toggles the LED every 500ms.
+
+---
+
+### **Expected Behavior:**  
+- The LED **blinks every 500ms** without needing a dedicated FreeRTOS task.
+
+---
+
+### **Summary of FreeRTOS Timer Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xTimerCreate(name, period, autoReload, ID, callback)** | Creates a timer |
+| **xTimerStart(timer, timeout)** | Starts the timer |
+| **xTimerStop(timer, timeout)** | Stops the timer |
+| **xTimerChangePeriod(timer, newPeriod, timeout)** | Changes timer period |
+
+---
+
+## **Next Step: FreeRTOS Event Groups for Task Synchronization**  
+
+
+### **Step 21: FreeRTOS Event Groups for Task Synchronization**  
+
+#### **Theory:**  
+- **Event Groups** in FreeRTOS allow multiple tasks to synchronize using **bitwise flags**.  
+- Tasks can **wait for specific bits** to be set before continuing execution.  
+- Useful for **inter-task communication**, **synchronization**, and **event-driven programming**.  
+
+---
+
+### **Practical: Synchronizing Two Tasks Using Event Groups**  
+#### **Objective:**  
+- Create an **Event Group**.  
+- Task 1 sets an event bit every **1 second**.  
+- Task 2 waits for the event bit and then **toggles an LED**.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create an Event Group** before starting the scheduler.  
+2. **Task 1:** Set the event flag every 1 second.  
+3. **Task 2:** Wait for the event flag and toggle the LED.  
+4. **Clear the event flag** after processing.  
+
+---
+
+### **Code for FreeRTOS Event Groups**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "event_groups.h"
+
+#define LED_PIN GPIO_PIN_13
+#define LED_PORT GPIOC
+
+#define EVENT_BIT (1 << 0) // Define event bit
+
+EventGroupHandle_t eventGroup;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void Task1_SetEvent(void *pvParameters);
+void Task2_WaitForEvent(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    eventGroup = xEventGroupCreate(); // Create event group
+
+    xTaskCreate(Task1_SetEvent, "Task1", 128, NULL, 1, NULL);
+    xTaskCreate(Task2_WaitForEvent, "Task2", 128, NULL, 1, NULL);
+
+    vTaskStartScheduler(); // Start FreeRTOS
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task 1: Set Event Every 1 Second */
+void Task1_SetEvent(void *pvParameters)
+{
+    while (1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1 second
+        xEventGroupSetBits(eventGroup, EVENT_BIT); // Set event flag
+    }
+}
+
+/* Task 2: Wait for Event and Toggle LED */
+void Task2_WaitForEvent(void *pvParameters)
+{
+    while (1)
+    {
+        xEventGroupWaitBits(eventGroup, EVENT_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
+        HAL_GPIO_TogglePin(LED_PORT, LED_PIN); // Toggle LED
+    }
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = LED_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create an Event Group** using `xEventGroupCreate()`.  
+2. **Task 1:** Sets the event flag every **1 second** using `xEventGroupSetBits()`.  
+3. **Task 2:** Waits for the event flag using `xEventGroupWaitBits()` before toggling the LED.  
+4. The event bit is **cleared after processing** using `pdTRUE` in `xEventGroupWaitBits()`.  
+
+---
+
+### **Expected Behavior:**  
+- The LED **toggles every second** based on the event flag set by Task 1.  
+
+---
+
+### **Summary of FreeRTOS Event Group Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xEventGroupCreate()** | Creates an event group |
+| **xEventGroupSetBits(group, bits)** | Sets event flags |
+| **xEventGroupWaitBits(group, bits, clear, all, timeout)** | Waits for event flags |
+| **xEventGroupClearBits(group, bits)** | Clears specific event flags |
+
+---
+
+## **Next Step: FreeRTOS Mutex for Resource Sharing**  
+
+
+### **Step 22: FreeRTOS Mutex for Resource Sharing**  
+
+#### **Theory:**  
+- **Mutex (Mutual Exclusion)** is used to protect **shared resources** (e.g., UART, LCD, variables).  
+- Ensures that **only one task** accesses the resource at a time.  
+- Prevents **race conditions** and **data corruption** in multitasking environments.  
+
+---
+
+### **Practical: Protecting UART Communication with Mutex**  
+#### **Objective:**  
+- Create a **Mutex** to synchronize access to **UART**.  
+- Two tasks will **attempt to send messages** via UART.  
+- Mutex ensures only **one task** accesses UART at a time.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a Mutex** before starting the scheduler.  
+2. **Task 1:** Prints `"Task 1: UART Access"` every 1 second.  
+3. **Task 2:** Prints `"Task 2: UART Access"` every 2 seconds.  
+4. Both tasks **acquire and release the Mutex** before accessing UART.  
+
+---
+
+### **Code for FreeRTOS Mutex**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+
+#define UART_TIMEOUT 100
+
+UART_HandleTypeDef huart2;
+SemaphoreHandle_t uartMutex;
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_USART2_UART_Init(void);
+void Task1_Print(void *pvParameters);
+void Task2_Print(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+    MX_USART2_UART_Init();
+
+    uartMutex = xSemaphoreCreateMutex(); // Create Mutex
+
+    xTaskCreate(Task1_Print, "Task1", 128, NULL, 1, NULL);
+    xTaskCreate(Task2_Print, "Task2", 128, NULL, 1, NULL);
+
+    vTaskStartScheduler(); // Start FreeRTOS
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task 1: Prints Message Every 1 Second */
+void Task1_Print(void *pvParameters)
+{
+    char msg[] = "Task 1: UART Access\r\n";
+    while (1)
+    {
+        if (xSemaphoreTake(uartMutex, portMAX_DELAY) == pdTRUE)
+        {
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, UART_TIMEOUT);
+            xSemaphoreGive(uartMutex); // Release Mutex
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Wait 1 sec
+    }
+}
+
+/* Task 2: Prints Message Every 2 Seconds */
+void Task2_Print(void *pvParameters)
+{
+    char msg[] = "Task 2: UART Access\r\n";
+    while (1)
+    {
+        if (xSemaphoreTake(uartMutex, portMAX_DELAY) == pdTRUE)
+        {
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, UART_TIMEOUT);
+            xSemaphoreGive(uartMutex); // Release Mutex
+        }
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Wait 2 sec
+    }
+}
+
+/* UART Initialization */
+static void MX_USART2_UART_Init(void)
+{
+    huart2.Instance = USART2;
+    huart2.Init.BaudRate = 115200;
+    huart2.Init.WordLength = UART_WORDLENGTH_8B;
+    huart2.Init.StopBits = UART_STOPBITS_1;
+    huart2.Init.Parity = UART_PARITY_NONE;
+    huart2.Init.Mode = UART_MODE_TX_RX;
+    huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+    huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+    HAL_UART_Init(&huart2);
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Mutex** using `xSemaphoreCreateMutex()`.  
+2. **Task 1 and Task 2** try to access UART.  
+3. Each task **locks the Mutex** using `xSemaphoreTake()`.  
+4. Task sends data over UART using `HAL_UART_Transmit()`.  
+5. After sending, **release the Mutex** using `xSemaphoreGive()`.  
+6. **Task 1 waits 1 second, Task 2 waits 2 seconds** before retrying.  
+
+---
+
+### **Expected Behavior:**  
+- `"Task 1: UART Access"` prints every **1 second**.  
+- `"Task 2: UART Access"` prints every **2 seconds**.  
+- Messages **never overlap** due to Mutex protection.  
+
+---
+
+### **Summary of FreeRTOS Mutex Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xSemaphoreCreateMutex()** | Creates a Mutex |
+| **xSemaphoreTake(mutex, timeout)** | Locks the Mutex |
+| **xSemaphoreGive(mutex)** | Releases the Mutex |
+
+---
+
+## **Next Step: FreeRTOS Software Timers**  
+
+
+### **Step 23: FreeRTOS Software Timers**  
+
+#### **Theory:**  
+- **Software Timers** allow periodic or one-shot execution of functions in FreeRTOS.  
+- Unlike hardware timers, software timers **don't require hardware resources**.  
+- Useful for **delayed function execution** or **periodic tasks** (e.g., blinking an LED, watchdog reset).  
+
+---
+
+### **Practical: Blinking an LED Using FreeRTOS Software Timer**  
+#### **Objective:**  
+- Create a **software timer** that toggles an LED every **500ms**.  
+- The timer callback function will execute on **timer expiry**.  
+- The LED toggling will be **handled by the software timer** instead of a task.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a software timer** before starting FreeRTOS.  
+2. **Define a callback function** that toggles an LED.  
+3. **Start the timer** when FreeRTOS begins execution.  
+4. Timer **expires every 500ms**, and the LED toggles.  
+
+---
+
+### **Code for FreeRTOS Software Timer**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+
+#define LED_TOGGLE_PERIOD pdMS_TO_TICKS(500) // 500ms
+
+TimerHandle_t ledTimerHandle; // Timer handle
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+void LedTimerCallback(TimerHandle_t xTimer);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    MX_GPIO_Init();
+
+    // Create software timer: Periodic mode, 500ms, Auto-start
+    ledTimerHandle = xTimerCreate("LedTimer", LED_TOGGLE_PERIOD, pdTRUE, NULL, LedTimerCallback);
+    
+    if (ledTimerHandle != NULL)
+    {
+        xTimerStart(ledTimerHandle, 0); // Start timer
+    }
+
+    vTaskStartScheduler(); // Start FreeRTOS
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Timer Callback Function */
+void LedTimerCallback(TimerHandle_t xTimer)
+{
+    HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5); // Toggle LED
+}
+
+/* GPIO Initialization */
+static void MX_GPIO_Init(void)
+{
+    __HAL_RCC_GPIOA_CLK_ENABLE();
+    
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create Software Timer:**  
+   ```c
+   ledTimerHandle = xTimerCreate("LedTimer", LED_TOGGLE_PERIOD, pdTRUE, NULL, LedTimerCallback);
+   ```
+   - Name: `"LedTimer"`
+   - Period: **500ms** (converted to ticks)
+   - Mode: **Periodic** (auto-repeats)
+   - Callback: `LedTimerCallback()` executes on timer expiry.
+
+2. **Start the Timer:**
+   ```c
+   xTimerStart(ledTimerHandle, 0);
+   ```
+   - Starts the **500ms timer** before FreeRTOS starts.
+
+3. **Toggle LED in Callback Function:**
+   ```c
+   void LedTimerCallback(TimerHandle_t xTimer)
+   {
+       HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);
+   }
+   ```
+   - Executes **every 500ms**, toggling LED.  
+
+---
+
+### **Expected Behavior:**  
+- **LED blinks every 500ms** using the software timer.  
+- **No dedicated task is required**, reducing CPU usage.  
+
+---
+
+### **Summary of FreeRTOS Software Timer Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xTimerCreate()** | Creates a software timer |
+| **xTimerStart()** | Starts the timer |
+| **xTimerStop()** | Stops the timer |
+| **xTimerReset()** | Resets the timer period |
+| **xTimerChangePeriod()** | Modifies the timer interval |
+
+---
+
+## **Next Step: FreeRTOS Event Groups**  
+
+
+### **Step 24: FreeRTOS Event Groups**  
+
+#### **Theory:**  
+- **Event Groups** are a way for tasks to communicate using **bit flags**.  
+- Each **bit** in an **event group** represents a separate **event or condition**.  
+- Tasks can **wait for specific events**, or **set/clear event bits** when conditions occur.  
+- **Useful for:**  
+  - Synchronizing multiple tasks.  
+  - Managing hardware events like **button presses, data ready signals, etc.**  
+  - **Efficient alternative to polling.**  
+
+---
+
+### **Practical: Synchronizing Two Tasks Using Event Groups**  
+#### **Objective:**  
+- One task (**Task A**) **waits for an event bit** before proceeding.  
+- Another task (**Task B**) **sets the event bit** after a delay.  
+- When the event is set, **Task A resumes execution**.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create an event group** before starting FreeRTOS.  
+2. **Define two tasks:**  
+   - **Task A:** Waits for an event.  
+   - **Task B:** Sets the event after 2 seconds.  
+3. **Run FreeRTOS Scheduler** to execute the tasks.  
+
+---
+
+### **Code for FreeRTOS Event Groups**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "event_groups.h"
+
+#define EVENT_BIT (1 << 0) // Event bit 0
+
+EventGroupHandle_t eventGroup; // Event Group Handle
+
+void TaskA(void *pvParameters);
+void TaskB(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+
+    // Create Event Group
+    eventGroup = xEventGroupCreate();
+
+    // Create Tasks
+    xTaskCreate(TaskA, "TaskA", 128, NULL, 2, NULL);
+    xTaskCreate(TaskB, "TaskB", 128, NULL, 1, NULL);
+
+    // Start Scheduler
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task A - Waits for Event */
+void TaskA(void *pvParameters)
+{
+    while (1)
+    {
+        printf("Task A: Waiting for event...\n");
+
+        // Wait for event bit 0 to be set
+        xEventGroupWaitBits(eventGroup, EVENT_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
+
+        printf("Task A: Event received! Continuing...\n");
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Simulate work
+    }
+}
+
+/* Task B - Sets Event */
+void TaskB(void *pvParameters)
+{
+    while (1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Delay for 2 seconds
+
+        printf("Task B: Setting event...\n");
+
+        // Set event bit 0
+        xEventGroupSetBits(eventGroup, EVENT_BIT);
+    }
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create Event Group:**  
+   ```c
+   eventGroup = xEventGroupCreate();
+   ```
+   - Allocates memory for an **event group** to store bit flags.
+
+2. **Task A: Waits for the Event Bit**
+   ```c
+   xEventGroupWaitBits(eventGroup, EVENT_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
+   ```
+   - **Blocks execution** until **EVENT_BIT** is set by another task.
+   - **Clears the bit after receiving** (`pdTRUE`).
+   - **Waits indefinitely** (`portMAX_DELAY`).
+
+3. **Task B: Sets the Event Bit**
+   ```c
+   xEventGroupSetBits(eventGroup, EVENT_BIT);
+   ```
+   - After **2 seconds**, Task B **sets the event**.
+   - Task A **resumes execution**.
+
+---
+
+### **Expected Behavior:**  
+- Task A **waits** for an event.  
+- Task B **sets** the event after 2 seconds.  
+- Task A **continues execution** when the event is received.  
+- This repeats in a loop.  
+
+---
+
+### **Summary of FreeRTOS Event Group Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xEventGroupCreate()** | Creates an event group |
+| **xEventGroupSetBits()** | Sets event bits |
+| **xEventGroupClearBits()** | Clears event bits |
+| **xEventGroupWaitBits()** | Waits for an event bit |
+| **xEventGroupGetBits()** | Reads event group bits |
+
+---
+
+## **Next Step: FreeRTOS Message Queues**  
+
+
+### **Step 25: FreeRTOS Message Queues**  
+
+#### **Theory:**  
+- **Queues** are used for **inter-task communication** in FreeRTOS.  
+- They allow tasks to **send and receive messages** (data structures, integers, etc.).  
+- **Key Benefits:**  
+  - Tasks can communicate **safely** without shared memory issues.  
+  - Supports **FIFO (First-In-First-Out)** behavior.  
+  - Can be used for **sensor data, logs, control commands, etc.**  
+
+---
+
+### **Practical: Sending and Receiving Messages Using a Queue**  
+#### **Objective:**  
+- Create a queue to hold **integer values**.  
+- Task A **sends a number** to the queue.  
+- Task B **receives the number** and prints it.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a queue** before starting FreeRTOS.  
+2. **Define two tasks:**  
+   - **Task A:** Sends numbers to the queue every second.  
+   - **Task B:** Reads numbers from the queue and prints them.  
+3. **Run FreeRTOS Scheduler** to execute the tasks.  
+
+---
+
+### **Code for FreeRTOS Queue Example**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+
+QueueHandle_t myQueue; // Queue handle
+
+void TaskA(void *pvParameters);
+void TaskB(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+
+    // Create a queue that holds 5 integers
+    myQueue = xQueueCreate(5, sizeof(int));
+
+    // Create Tasks
+    xTaskCreate(TaskA, "TaskA", 128, NULL, 2, NULL);
+    xTaskCreate(TaskB, "TaskB", 128, NULL, 1, NULL);
+
+    // Start Scheduler
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task A - Sends data to Queue */
+void TaskA(void *pvParameters)
+{
+    int value = 0;
+    while (1)
+    {
+        value++;
+        printf("Task A: Sending %d to queue\n", value);
+
+        // Send value to queue (wait up to 100ms if queue is full)
+        xQueueSend(myQueue, &value, pdMS_TO_TICKS(100));
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Send data every 1 sec
+    }
+}
+
+/* Task B - Receives data from Queue */
+void TaskB(void *pvParameters)
+{
+    int receivedValue;
+    while (1)
+    {
+        // Wait indefinitely until data is received
+        if (xQueueReceive(myQueue, &receivedValue, portMAX_DELAY))
+        {
+            printf("Task B: Received %d from queue\n", receivedValue);
+        }
+    }
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Queue**  
+   ```c
+   myQueue = xQueueCreate(5, sizeof(int));
+   ```
+   - Creates a queue with **5 slots**, each storing an **integer**.  
+
+2. **Task A: Sends Data to the Queue**  
+   ```c
+   xQueueSend(myQueue, &value, pdMS_TO_TICKS(100));
+   ```
+   - Increments `value` and **sends it to the queue**.  
+   - Waits **up to 100ms** if the queue is full.  
+   - Runs every **1 second** (`vTaskDelay(1000ms)`).  
+
+3. **Task B: Reads Data from the Queue**  
+   ```c
+   xQueueReceive(myQueue, &receivedValue, portMAX_DELAY);
+   ```
+   - **Waits indefinitely** (`portMAX_DELAY`) for data.  
+   - Reads the value **when available** and prints it.  
+
+---
+
+### **Expected Behavior:**  
+- **Task A sends numbers** `1, 2, 3...` every second.  
+- **Task B reads and prints** the numbers from the queue.  
+- The process **repeats indefinitely**.  
+
+---
+
+### **Summary of FreeRTOS Queue Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xQueueCreate()** | Creates a queue |
+| **xQueueSend()** | Sends data to a queue |
+| **xQueueReceive()** | Receives data from a queue |
+| **uxQueueMessagesWaiting()** | Checks the number of items in the queue |
+| **uxQueueSpacesAvailable()** | Checks available space in the queue |
+
+---
+
+## **Next Step: FreeRTOS Mutexes (Avoiding Task Conflicts)**  
+
+
+### **Step 26: FreeRTOS Mutexes (Mutual Exclusion Semaphores)**  
+
+#### **Theory:**  
+- A **Mutex (Mutual Exclusion Semaphore)** is used to **prevent multiple tasks from accessing shared resources** simultaneously.  
+- Unlike binary semaphores, **mutexes include priority inheritance**, preventing priority inversion.  
+- Commonly used for **protecting shared variables, peripherals (UART, SPI, I2C), or filesystems**.  
+
+---
+
+### **Practical: Using a Mutex to Protect Shared UART Output**  
+#### **Objective:**  
+- Create a **mutex** to control access to UART.  
+- Two tasks will try to **print messages** over UART.  
+- Mutex ensures only **one task prints at a time**.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a mutex** before starting FreeRTOS.  
+2. **Define two tasks** that both try to use UART.  
+3. **Each task takes the mutex before printing** and releases it after.  
+4. **Run FreeRTOS Scheduler** to execute the tasks.  
+
+---
+
+### **Code for FreeRTOS Mutex Example**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "semphr.h"
+
+SemaphoreHandle_t uartMutex; // Mutex handle
+
+void Task1(void *pvParameters);
+void Task2(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+
+    // Create a mutex before starting tasks
+    uartMutex = xSemaphoreCreateMutex();
+
+    // Create Tasks
+    xTaskCreate(Task1, "Task1", 128, NULL, 2, NULL);
+    xTaskCreate(Task2, "Task2", 128, NULL, 1, NULL);
+
+    // Start Scheduler
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task 1: Prints a message */
+void Task1(void *pvParameters)
+{
+    while (1)
+    {
+        // Take the mutex before printing
+        if (xSemaphoreTake(uartMutex, portMAX_DELAY))
+        {
+            printf("Task 1: Hello from Task 1\n");
+
+            // Release the mutex after printing
+            xSemaphoreGive(uartMutex);
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay 1 sec
+    }
+}
+
+/* Task 2: Prints a message */
+void Task2(void *pvParameters)
+{
+    while (1)
+    {
+        // Take the mutex before printing
+        if (xSemaphoreTake(uartMutex, portMAX_DELAY))
+        {
+            printf("Task 2: Hello from Task 2\n");
+
+            // Release the mutex after printing
+            xSemaphoreGive(uartMutex);
+        }
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay 1 sec
+    }
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Mutex**  
+   ```c
+   uartMutex = xSemaphoreCreateMutex();
+   ```
+   - Creates a **mutex** to control **UART access**.  
+
+2. **Task 1 and Task 2: Taking and Releasing Mutex**  
+   ```c
+   if (xSemaphoreTake(uartMutex, portMAX_DELAY))
+   ```
+   - **Waits indefinitely** for the mutex.  
+   - If another task holds the mutex, it **blocks** until it becomes available.  
+
+   ```c
+   printf("Task 1: Hello from Task 1\n");
+   ```
+   - Prints a message **after acquiring the mutex**.  
+
+   ```c
+   xSemaphoreGive(uartMutex);
+   ```
+   - **Releases the mutex** after printing, allowing another task to print.  
+
+3. **vTaskDelay(1000ms)**  
+   - Ensures that **tasks do not continuously request the mutex**.  
+
+---
+
+### **Expected Behavior:**  
+- **Task 1 and Task 2 alternate printing messages**.  
+- **Mutex ensures that only one task prints at a time**.  
+- Prevents **UART output corruption** from concurrent access.  
+
+---
+
+### **Summary of FreeRTOS Mutex Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xSemaphoreCreateMutex()** | Creates a mutex |
+| **xSemaphoreTake()** | Locks (takes) the mutex |
+| **xSemaphoreGive()** | Unlocks (releases) the mutex |
+
+---
+
+## **Next Step: FreeRTOS Event Groups (Task Synchronization)**  
+
+
+### **Step 27: FreeRTOS Event Groups (Task Synchronization)**  
+
+#### **Theory:**  
+- **Event Groups** allow tasks to **synchronize** using **bitwise flags**.  
+- Unlike queues and semaphores, they enable multiple tasks to **wait for specific conditions** before proceeding.  
+- Each **bit in the event group** represents a different event, and tasks can **wait for one or multiple events**.  
+
+---
+
+### **Practical: Synchronizing Two Tasks Using an Event Group**  
+#### **Objective:**  
+- Create an **Event Group** to synchronize two tasks.  
+- **Task 1 sets an event** after performing an operation.  
+- **Task 2 waits for the event** before proceeding.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create an Event Group** before starting FreeRTOS.  
+2. **Define two tasks:**  
+   - **Task 1:** Sets an event bit after a delay.  
+   - **Task 2:** Waits for the event bit before executing.  
+3. **Run the FreeRTOS Scheduler** to execute tasks.  
+
+---
+
+### **Code for FreeRTOS Event Group Example**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "event_groups.h"
+
+EventGroupHandle_t eventGroup; // Handle for Event Group
+
+#define EVENT_BIT (1 << 0) // Define event bit (Bit 0)
+
+void Task1(void *pvParameters);
+void Task2(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+
+    // Create an event group before starting tasks
+    eventGroup = xEventGroupCreate();
+
+    // Create Tasks
+    xTaskCreate(Task1, "Task1", 128, NULL, 2, NULL);
+    xTaskCreate(Task2, "Task2", 128, NULL, 1, NULL);
+
+    // Start Scheduler
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Task 1: Sets the event bit */
+void Task1(void *pvParameters)
+{
+    while (1)
+    {
+        vTaskDelay(pdMS_TO_TICKS(2000)); // Simulate some processing
+        printf("Task 1: Setting Event Bit\n");
+
+        // Set event bit
+        xEventGroupSetBits(eventGroup, EVENT_BIT);
+    }
+}
+
+/* Task 2: Waits for the event bit */
+void Task2(void *pvParameters)
+{
+    while (1)
+    {
+        printf("Task 2: Waiting for Event Bit\n");
+
+        // Wait until event bit is set
+        xEventGroupWaitBits(eventGroup, EVENT_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
+
+        printf("Task 2: Event Received! Proceeding...\n");
+
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Simulate processing
+    }
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create an Event Group**  
+   ```c
+   eventGroup = xEventGroupCreate();
+   ```
+   - Creates an **Event Group** to store synchronization flags.  
+
+2. **Task 1: Setting the Event Bit**  
+   ```c
+   xEventGroupSetBits(eventGroup, EVENT_BIT);
+   ```
+   - **Sets Bit 0** to indicate an event has occurred.  
+
+3. **Task 2: Waiting for the Event Bit**  
+   ```c
+   xEventGroupWaitBits(eventGroup, EVENT_BIT, pdTRUE, pdFALSE, portMAX_DELAY);
+   ```
+   - **Blocks until Bit 0 is set** by Task 1.  
+   - The **pdTRUE** parameter clears the bit after it is received.  
+   - The **portMAX_DELAY** means it waits indefinitely.  
+
+4. **Tasks Print Messages**  
+   - **Task 1:** Prints `"Task 1: Setting Event Bit"` every 2 sec.  
+   - **Task 2:** Waits, then prints `"Task 2: Event Received! Proceeding..."`.  
+
+---
+
+### **Expected Behavior:**  
+- **Task 2 starts waiting** for the event bit.  
+- **Task 1 sets the bit after 2 seconds**.  
+- **Task 2 detects the event and proceeds**.  
+- The cycle **repeats indefinitely**.  
+
+---
+
+### **Summary of FreeRTOS Event Group Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xEventGroupCreate()** | Creates an Event Group |
+| **xEventGroupSetBits()** | Sets an event bit |
+| **xEventGroupWaitBits()** | Waits for an event bit |
+| **xEventGroupClearBits()** | Clears a specific bit |
+
+---
+
+## **Next Step: FreeRTOS Software Timers**  
+
+
+### **Step 28: FreeRTOS Software Timers**  
+
+#### **Theory:**  
+- FreeRTOS **Software Timers** allow executing functions **at fixed intervals** without using hardware timers.  
+- They **run in the background** without blocking tasks.  
+- Useful for **periodic actions** like LED blinking, watchdog resets, or sensor polling.  
+
+---
+
+### **Practical: Blinking an LED using a FreeRTOS Software Timer**  
+#### **Objective:**  
+- Create a **software timer** that toggles an LED **every 1 second**.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a Timer Handle** before starting the scheduler.  
+2. **Define a Timer Callback Function** that toggles an LED.  
+3. **Create and Start the Timer** in the `main()` function.  
+4. **Let FreeRTOS manage the timer** while running other tasks.  
+
+---
+
+### **Code for FreeRTOS Software Timer Example**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+
+#define LED_PIN GPIO_PIN_13
+#define LED_PORT GPIOC
+
+TimerHandle_t myTimerHandle; // Handle for the software timer
+
+void TimerCallback(TimerHandle_t xTimer); // Timer callback function
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+
+    // Initialize LED GPIO (Assuming LED is on PC13)
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = LED_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+
+    // Create a software timer
+    myTimerHandle = xTimerCreate("LED_Timer", pdMS_TO_TICKS(1000), pdTRUE, (void *)0, TimerCallback);
+
+    if (myTimerHandle != NULL)
+    {
+        xTimerStart(myTimerHandle, 0); // Start timer
+    }
+
+    // Start FreeRTOS Scheduler
+    vTaskStartScheduler();
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Timer Callback Function */
+void TimerCallback(TimerHandle_t xTimer)
+{
+    HAL_GPIO_TogglePin(LED_PORT, LED_PIN); // Toggle LED
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Timer Handle**  
+   ```c
+   TimerHandle_t myTimerHandle;
+   ```
+   - Stores the timer reference.
+
+2. **Define a Timer Callback Function**  
+   ```c
+   void TimerCallback(TimerHandle_t xTimer)
+   {
+       HAL_GPIO_TogglePin(LED_PORT, LED_PIN);
+   }
+   ```
+   - Toggles the LED **every time the timer expires**.
+
+3. **Create a Software Timer**  
+   ```c
+   myTimerHandle = xTimerCreate("LED_Timer", pdMS_TO_TICKS(1000), pdTRUE, (void *)0, TimerCallback);
+   ```
+   - `"LED_Timer"` → Timer name.  
+   - `pdMS_TO_TICKS(1000)` → Converts 1000ms to RTOS ticks.  
+   - `pdTRUE` → Makes the timer **auto-restart**.  
+   - `TimerCallback` → Function executed **every second**.  
+
+4. **Start the Timer**  
+   ```c
+   xTimerStart(myTimerHandle, 0);
+   ```
+   - Starts the timer **immediately** after creation.  
+
+---
+
+### **Expected Behavior:**  
+- The **LED blinks every second** without using a hardware timer.  
+- The FreeRTOS **scheduler handles the timing** efficiently.  
+
+---
+
+### **Summary of FreeRTOS Timer Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xTimerCreate()** | Creates a software timer |
+| **xTimerStart()** | Starts the timer |
+| **xTimerStop()** | Stops the timer |
+| **xTimerReset()** | Resets the timer |
+| **xTimerChangePeriod()** | Changes the timer interval |
+
+---
+
+## **Next Step: FreeRTOS Message Queues**  
+
+
+### **Step 29: FreeRTOS Message Queues**  
+
+#### **Theory:**  
+- A **Queue** is a **FIFO (First-In-First-Out) buffer** used for **task communication** in FreeRTOS.  
+- Tasks **send and receive data** using queues without blocking execution.  
+- Used for **sensor data sharing, event handling, and inter-task communication**.  
+
+---
+
+### **Practical: Sending and Receiving Data Using a Queue**  
+#### **Objective:**  
+- Create a **producer task** that sends a number (0-9) to a queue every second.  
+- Create a **consumer task** that receives the number and prints it via UART.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a Queue Handle** before starting the scheduler.  
+2. **Define Producer and Consumer Tasks.**  
+3. **Producer Task:** Sends data (0-9) to the queue every second.  
+4. **Consumer Task:** Reads data from the queue and sends it via UART.  
+5. **Start the FreeRTOS Scheduler.**  
+
+---
+
+### **Code for FreeRTOS Message Queue Example**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "queue.h"
+#include "usart.h"
+
+QueueHandle_t myQueue;  // Queue handle
+
+void ProducerTask(void *pvParameters);
+void ConsumerTask(void *pvParameters);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    
+    // Initialize UART
+    MX_USART2_UART_Init(); 
+
+    // Create a queue of size 5 (each element is an int)
+    myQueue = xQueueCreate(5, sizeof(int));
+
+    if (myQueue != NULL)
+    {
+        // Create Producer and Consumer tasks
+        xTaskCreate(ProducerTask, "Producer", 128, NULL, 1, NULL);
+        xTaskCreate(ConsumerTask, "Consumer", 128, NULL, 1, NULL);
+
+        // Start FreeRTOS Scheduler
+        vTaskStartScheduler();
+    }
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Producer Task */
+void ProducerTask(void *pvParameters)
+{
+    int count = 0;
+    while (1)
+    {
+        xQueueSend(myQueue, &count, portMAX_DELAY); // Send number to queue
+        count = (count + 1) % 10; // Increment (0-9)
+        vTaskDelay(pdMS_TO_TICKS(1000)); // Delay 1 sec
+    }
+}
+
+/* Consumer Task */
+void ConsumerTask(void *pvParameters)
+{
+    int receivedValue;
+    char msg[20];
+
+    while (1)
+    {
+        if (xQueueReceive(myQueue, &receivedValue, portMAX_DELAY) == pdTRUE)
+        {
+            sprintf(msg, "Received: %d\r\n", receivedValue);
+            HAL_UART_Transmit(&huart2, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
+        }
+    }
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Queue Handle**  
+   ```c
+   QueueHandle_t myQueue;
+   ```
+   - Stores reference to the queue.
+
+2. **Create a Queue with Size 5**  
+   ```c
+   myQueue = xQueueCreate(5, sizeof(int));
+   ```
+   - Holds **5 integers** at a time.
+
+3. **Producer Task**  
+   ```c
+   xQueueSend(myQueue, &count, portMAX_DELAY);
+   ```
+   - Sends `count` (0-9) to the queue every second.
+
+4. **Consumer Task**  
+   ```c
+   xQueueReceive(myQueue, &receivedValue, portMAX_DELAY);
+   ```
+   - Reads value from the queue.  
+   - Prints it over **UART**.
+
+---
+
+### **Expected Behavior:**  
+- Every second, **Producer Task** sends numbers `0-9` to the queue.  
+- **Consumer Task** reads the numbers and prints:  
+  ```
+  Received: 0
+  Received: 1
+  Received: 2
+  ...
+  ```
+
+---
+
+### **Summary of FreeRTOS Queue Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xQueueCreate()** | Creates a queue |
+| **xQueueSend()** | Sends data to the queue |
+| **xQueueReceive()** | Receives data from the queue |
+| **uxQueueMessagesWaiting()** | Gets the number of items in the queue |
+
+---
+
+## **Next Step: FreeRTOS Event Groups**  
+
+
+### **Step 31: FreeRTOS Software Timers**  
+
+#### **Theory:**  
+- **Software Timers** allow tasks to execute **periodically** or after a **one-time delay**.  
+- FreeRTOS timers run **without blocking tasks**.  
+- Timer callbacks execute in the **timer service task**.  
+
+---
+
+### **Practical: Blinking LED using a FreeRTOS Timer**  
+#### **Objective:**  
+- Create a **software timer** that toggles an LED every **1 second**.  
+- Use a **timer callback function** to handle LED toggling.  
+
+---
+
+### **Steps to Implement:**  
+1. **Create a Timer Handle.**  
+2. **Define Timer Callback Function.**  
+3. **Create and Start the Timer in `main()`.**  
+4. **The Callback function toggles an LED every 1 second.**  
+
+---
+
+### **Code for FreeRTOS Software Timer Example**
+```c
+#include "main.h"
+#include "FreeRTOS.h"
+#include "task.h"
+#include "timers.h"
+
+#define LED_PIN GPIO_PIN_13
+#define LED_PORT GPIOC
+
+TimerHandle_t myTimerHandle;  // Timer handle
+
+void TimerCallback(TimerHandle_t xTimer);
+
+int main(void)
+{
+    HAL_Init();
+    SystemClock_Config();
+    
+    // Initialize GPIO for LED
+    __HAL_RCC_GPIOC_CLK_ENABLE();
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+    GPIO_InitStruct.Pin = LED_PIN;
+    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+    HAL_GPIO_Init(LED_PORT, &GPIO_InitStruct);
+
+    // Create Software Timer (1 sec period, auto-reload)
+    myTimerHandle = xTimerCreate("LED_Timer", pdMS_TO_TICKS(1000), pdTRUE, 0, TimerCallback);
+
+    if (myTimerHandle != NULL)
+    {
+        xTimerStart(myTimerHandle, 0);  // Start Timer
+        vTaskStartScheduler();  // Start FreeRTOS Scheduler
+    }
+
+    while (1)
+    {
+        // Should never reach here
+    }
+}
+
+/* Timer Callback Function */
+void TimerCallback(TimerHandle_t xTimer)
+{
+    HAL_GPIO_TogglePin(LED_PORT, LED_PIN);  // Toggle LED
+}
+
+/* System Clock Configuration */
+void SystemClock_Config(void)
+{
+    // Auto-generated by STM32CubeMX
+}
+```
+
+---
+
+### **Explanation of Code:**  
+1. **Create a Timer Handle**  
+   ```c
+   TimerHandle_t myTimerHandle;
+   ```
+   - Stores **timer instance**.
+
+2. **Create a Software Timer**  
+   ```c
+   myTimerHandle = xTimerCreate("LED_Timer", pdMS_TO_TICKS(1000), pdTRUE, 0, TimerCallback);
+   ```
+   - Timer named **"LED_Timer"**.  
+   - Period = **1000 ms (1 sec)**.  
+   - **pdTRUE** → Auto-reloads after expiration.  
+   - Callback function → **TimerCallback()**.  
+
+3. **Start Timer**  
+   ```c
+   xTimerStart(myTimerHandle, 0);
+   ```
+   - Starts timer **immediately**.  
+
+4. **Timer Callback Function**  
+   ```c
+   void TimerCallback(TimerHandle_t xTimer)
+   {
+       HAL_GPIO_TogglePin(LED_PORT, LED_PIN);
+   }
+   ```
+   - Toggles **LED** every second.  
+
+---
+
+### **Expected Behavior:**  
+- **Every 1 second**, the LED **toggles ON/OFF** automatically.  
+
+---
+
+### **Summary of FreeRTOS Timer Functions**  
+| **Function** | **Purpose** |
+|-------------|-------------|
+| **xTimerCreate()** | Creates a software timer |
+| **xTimerStart()** | Starts a timer |
+| **xTimerStop()** | Stops a timer |
+| **xTimerChangePeriod()** | Changes timer period |
+| **xTimerDelete()** | Deletes a timer |
+
+---
+
+## **Next Step: FreeRTOS Message Queues**  
