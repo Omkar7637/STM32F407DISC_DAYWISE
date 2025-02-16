@@ -1,7 +1,5 @@
 # STM32F407DISC_DAYWISE
 
-Here's a **14-day** structured plan to teach the **STM32F407 DISC1** board using **HAL (Hardware Abstraction Layer)**, covering both **theory and practicals**.
-
 ---
 
 ## **Day 1: Introduction to STM32 and Development Environment**
@@ -214,10 +212,6 @@ Here's a **14-day** structured plan to teach the **STM32F407 DISC1** board using
 
 ---
 
-## **Final Thoughts:**
-This plan provides a **structured** approach covering **STM32F407 peripherals** with **HAL**, ensuring **both theoretical** and **practical** knowledge.  
-Let me know if you need modifications or additional details! 🚀
-
 # **Day 1: Introduction to STM32 and Development Environment**
 
 ## **1. Overview of STM32 Series**
@@ -322,7 +316,6 @@ STM32 is a **powerful and versatile** family of microcontrollers, offering **hig
 
 ---
 
-This covers **Day 1 (Theory)**. Let me know if you want **further modifications or practical session details**! 🚀
 
 # **Day 2: GPIO (General Purpose Input/Output)**
 
@@ -546,7 +539,6 @@ void EXTI15_10_IRQHandler(void) {
   - `HAL_GPIO_ReadPin()`
   - `HAL_NVIC_EnableIRQ()`
 
-This covers **Day 2**! 🚀 Let me know if you need modifications.
 
 # **Day 3: RCC (Reset and Clock Control)**
 
@@ -749,8 +741,6 @@ void RTC_Config(void) {
 - **PLL multiplies clock frequency** to achieve 168 MHz.
 - **MCO outputs clock signals** for debugging.
 - **RTC uses LSE for accurate timekeeping**.
-
-This completes **Day 3**! 🚀 Let me know if you need modifications.
 
 # **Day 4: UART (Universal Asynchronous Receiver Transmitter)**
 
@@ -988,7 +978,6 @@ To verify data transmission:
 - **DMA Mode** is best for high-speed data transfer.
 - **Test using Putty/TeraTerm** to verify output.
 
-🚀 This completes **Day 4**! Let me know if you need changes.
 
 # **Day 5: Timer and PWM (Pulse Width Modulation)**
 
@@ -1238,7 +1227,6 @@ int main(void) {
 - **PWM** is useful for LED dimming and motor control.
 - **Input Capture Mode** measures external PWM frequencies.
 
-🚀 This completes **Day 5**! Let me know if you need modifications.
 
 # **Day 6: ADC (Analog to Digital Converter)**
 
@@ -1458,7 +1446,6 @@ void MX_DMA_Init(void) {
 - **ADC Interrupt Mode** → Notifies CPU when conversion is complete.
 - **ADC DMA Mode** → Transfers ADC data to memory without CPU usage.
 
-🚀 This completes **Day 6**! Let me know if you need modifications.
 
 # **Day 7: DAC (Digital to Analog Converter)**
 
@@ -1887,8 +1874,6 @@ int main(void) {
 - **Master-Slave Communication** → Data exchange between two STM32.
 - **SPI with Sensor/Display** → Interfaces with an **OLED using SPI**.
 
-🚀 This completes **Day 8**! Let me know if you need modifications.
-
 
 # **Day 9: I2C (Inter-Integrated Circuit)**
 
@@ -2016,8 +2001,6 @@ void MPU6050_Read_Accel(void) {
 - **I2C EEPROM (24Cxx)** → Read & write data.
 - **MPU6050 Sensor** → Read acceleration & gyroscope data.
 
-🚀 This completes **Day 9**! Let me know if you need modifications.
-
 
 # **Day 10: External Interrupts and NVIC (Nested Vector Interrupt Controller)**
 
@@ -2138,7 +2121,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 - **EXTI** is used for external interrupts (e.g., button press).
 - **Debouncing** prevents false triggering.
 
-🚀 This completes **Day 10**! Let me know if you need modifications.
 
 
 # **Day 11: Real-Time Clock (RTC) and Watchdog Timer**
@@ -2308,8 +2290,6 @@ int main(void) {
 - **IWDG** resets MCU on failure.
 - **WWDG** prevents unexpected execution errors.
 
-🚀 This completes **Day 11**! Let me know if you need modifications.
-
 
 # **Day 12: Low Power Modes and Power Management**
 
@@ -2435,8 +2415,6 @@ int main(void) {
 - **Stop Mode**: Everything stops except RAM, wakes up via EXTI or RTC.
 - **Standby Mode**: Power off, RAM lost, wakes up via Reset or RTC.
 
-🚀 **Day 12 Complete!** Let me know if you need modifications.
-
 
 # **Day 13: USB Communication (USB CDC)**
 
@@ -2533,8 +2511,6 @@ int main(void) {
 - **USB CDC** allows STM32 to act as a **Virtual COM Port**.
 - **HAL API** simplifies USB communication.
 - **PC terminal software** (Putty, TeraTerm) can test USB CDC.
-
-🚀 **Day 13 Complete!** Let me know if you need modifications.
 
 
 # **Day 14: FreeRTOS Basics with STM32**
@@ -2739,6 +2715,4 @@ void UART_Task(void *pvParameters) {
 - **FreeRTOS** enables multitasking in STM32.
 - **Semaphores** synchronize task execution.
 - **Queues** allow message passing between tasks.
-
-🚀 **Day 14 Complete!** Let me know if you need any modifications.
 
